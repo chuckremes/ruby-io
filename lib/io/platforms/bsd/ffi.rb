@@ -20,7 +20,7 @@ class IO
     #            intptr_t        data;           /* filter-specific data */
     #            void            *udata;         /* opaque user data identifier */
     #    };
-    class KEventStruct < FFI::Struct
+    class KEventStruct < ::FFI::Struct
       layout \
         :ident, :uintptr_t,
         :filter, :int16,
@@ -170,17 +170,17 @@ class IO
       end
     end
 
-    class TimeSpecStruct < FFI::Struct
+    class TimeSpecStruct < ::FFI::Struct
       layout \
         :tv_sec, :long,
         :tv_nsec, :long
     end
 
     def self.address_of(struct:, field:)
-      FFI::Pointer.new(:uint8, struct.pointer.address + struct.offset_of(field))
+      ::FFI::Pointer.new(:uint8, struct.pointer.address + struct.offset_of(field))
     end
 
-    class AddrInfoStruct < FFI::Struct
+    class AddrInfoStruct < ::FFI::Struct
       attr_accessor :sock_addr_ref
 
       layout :ai_flags, :int,
@@ -200,10 +200,10 @@ class IO
         copy[:ai_protocol] = struct[:ai_protocol]
         copy[:ai_addrlen] = struct[:ai_addrlen]
 
-        copy[:ai_canonname] = if struct[:ai_canonname].null?
-          FFI::Pointer::NULL
+        copy[:ai_canonname] = if struct[:ai_canonname].nil? || struct[:ai_canonname].null?
+          ::FFI::Pointer::NULL
         else
-          FFI::MemoryPointer.from_string(struct[:ai_canonname].read_string_to_null)
+          ::FFI::MemoryPointer.from_string(struct[:ai_canonname].read_string_to_null)
         end
 
         # We need to save a reference to our new copy of the SockAddr*Struct so it
@@ -236,7 +236,7 @@ class IO
       end
     end
 
-    class IfAddrsStruct < FFI::Struct
+    class IfAddrsStruct < ::FFI::Struct
       layout :ifa_next, :pointer,
         :ifa_name, :string,
         :ifa_flags, :int,
@@ -246,7 +246,7 @@ class IO
         :ifa_dstaddr, :pointer
     end
 
-    class SockAddrStruct < FFI::Struct
+    class SockAddrStruct < ::FFI::Struct
       layout :sa_len, :uint8,
         :sa_family, :sa_family_t,
         :sa_data, [:uint8, 14]
@@ -256,22 +256,22 @@ class IO
       end
     end
 
-    class SockAddrStorageStruct < FFI::Struct
+    class SockAddrStorageStruct < ::FFI::Struct
       layout :ss_len, :uint8,
         :ss_family, :sa_family_t,
         :ss_data, [:uint8, 126]
     end
 
-    class SockLenStruct < FFI::Struct
+    class SockLenStruct < ::FFI::Struct
       layout :socklen, :socklen_t
     end
 
-    class TimevalStruct < FFI::Struct
+    class TimevalStruct < ::FFI::Struct
       layout :tv_sec, :time_t,
         :tv_usec, :suseconds_t
     end
 
-    class SockAddrInStruct < FFI::Struct
+    class SockAddrInStruct < ::FFI::Struct
       layout :sin_len, :uint8,
         :sin_family, :sa_family_t,
         :sin_port, :ushort,
@@ -283,7 +283,7 @@ class IO
       end
 
       def to_ip
-        str = FFI::MemoryPointer.new(:string, Platforms::INET_ADDRSTRLEN)
+        str = ::FFI::MemoryPointer.new(:string, Platforms::INET_ADDRSTRLEN)
         # tricky; make a helper method to return a pointer to a struct's field
         # so we can abstract out this work
         sin_addr_ptr = Platforms.address_of(struct: self, field: :sin_addr)
@@ -310,7 +310,7 @@ class IO
       end
     end
 
-    class SockAddrIn6Struct < FFI::Struct
+    class SockAddrIn6Struct < ::FFI::Struct
       layout :sin6_len, :uint8,
         :sin6_family, :sa_family_t,
         :sin6_port, :ushort,
@@ -331,7 +331,7 @@ class IO
       end
 
       def to_ip
-        str = FFI::MemoryPointer.new(:string, Platforms::INET6_ADDRSTRLEN)
+        str = ::FFI::MemoryPointer.new(:string, Platforms::INET6_ADDRSTRLEN)
         # tricky; make a helper method to return a pointer to a struct's field
         # so we can abstract out this work
         sin_addr_ptr = Platforms.address_of(struct: self, field: :sin6_addr)
@@ -352,7 +352,7 @@ class IO
       end
     end
 
-    class SockAddrUnStruct < FFI::Struct
+    class SockAddrUnStruct < ::FFI::Struct
       layout :sun_len, :uint8,
         :sun_family, :sa_family_t,
         :sun_path, [:uint8, 104]

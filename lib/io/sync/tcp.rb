@@ -54,7 +54,7 @@ class IO
         end
         
         def getaddrinfo(hostname:, service:, hints:)
-          results = FFI::MemoryPointer.new(:pointer)
+          results = ::FFI::MemoryPointer.new(:pointer)
           result = Internal::Backend::Sync.getaddrinfo(hostname: hostname, service: service, hints: hints, results: results, timeout: nil)
           ptr = results.read_pointer
           structs = []

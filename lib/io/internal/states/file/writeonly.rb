@@ -36,7 +36,7 @@ class IO
 
           def write(offset:, string:, timeout: nil)
             nbytes = string.bytesize
-            buffer = FFI::MemoryPointer.new(nbytes)
+            buffer = ::FFI::MemoryPointer.new(nbytes)
             buffer.write_string(string)
             rc, errno = @backend.write(fd: @fd, buffer: buffer, nbytes: nbytes, offset: offset, timeout: timeout)
             [rc, errno]

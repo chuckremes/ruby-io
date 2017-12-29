@@ -2,9 +2,9 @@ require 'ffi'
 
 class IO
   module Platforms
-    extend FFI::Library
+    extend ::FFI::Library
 
-    ffi_lib FFI::Library::LIBC
+    ffi_lib ::FFI::Library::LIBC
 
     # attach to functions common to all POSIX-compliant platforms
     attach_function :open, [:pointer, :int, :int], :int, :blocking => true
@@ -31,10 +31,10 @@ class IO
     attach_function :getpagesize, [], :int
 
     # Load platform-specific files
-    if FFI::Platform::IS_BSD
+    if ::FFI::Platform::IS_BSD
       require_relative 'bsd/ffi'
       require_relative 'bsd/poller'
-    elsif FFI::Platform::IS_LINUX
+    elsif ::FFI::Platform::IS_LINUX
       require_relative 'linux/ffi'
     else
       # Can setup select(2) or poll(2) here as a backup for kqueue(2) and epoll(2)

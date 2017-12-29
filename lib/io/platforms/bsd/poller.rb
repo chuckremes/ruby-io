@@ -16,9 +16,9 @@ class IO
         @kq_fd = Platforms.kqueue
 
         # fatal error if we can't allocate the kqueue
-        raise "Fatal error, kqueue failed to allocate, rc [#{@kq_fd}], errno [#{FFI.errno}]" if @kq_fd < 0
+        raise "Fatal error, kqueue failed to allocate, rc [#{@kq_fd}], errno [#{::FFI.errno}]" if @kq_fd < 0
 
-        @events_memory = FFI::MemoryPointer.new(Platforms::KEventStruct, MAX_EVENTS)
+        @events_memory = ::FFI::MemoryPointer.new(Platforms::KEventStruct, MAX_EVENTS)
         @events = MAX_EVENTS.times.to_a.map do |index|
           Platforms::KEventStruct.new(@events_memory + index * Platforms::KEventStruct.size)
         end
@@ -65,7 +65,7 @@ class IO
         if rc >= 0
           rc.times { |index| process_event(event: @events[index]) }
         else
-          Logger.debug(klass: self.class, name: 'kqueue poller', message: "rc [#{rc}], errno [#{FFI.errno}]")
+          Logger.debug(klass: self.class, name: 'kqueue poller', message: "rc [#{rc}], errno [#{::FFI.errno}]")
         end
       end
 

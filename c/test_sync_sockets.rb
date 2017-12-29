@@ -16,7 +16,7 @@ server_thr = Thread.new do
 
   server.accept do |address, socket, fd, errno|
     puts "ACCEPTED A SOCKET, rc [#{fd}], errno [#{errno}]"
-    buffer = FFI::MemoryPointer.new(:char, 500)
+    buffer = ::FFI::MemoryPointer.new(:char, 500)
     rc, errno = socket.recv(buffer: buffer, flags: 0)
     puts "SERVER: recv: rc [#{rc}], errno [#{errno}], string [#{buffer.read_string}]"
     p socket
@@ -39,7 +39,7 @@ client_thr = Thread.new do
   puts "CLIENT TRYING TO CONNECT"
   client.connect(addr: addr)
   puts "CLIENT CONNECTED!"
-  buffer = FFI::MemoryPointer.new(:char, 500)
+  buffer = ::FFI::MemoryPointer.new(:char, 500)
   buffer.write_string('request from client to server.')
   puts "CLIENT: about to send some data, [#{buffer.read_string}]"
   rc, errno = client.ssend(buffer: buffer, flags: 0)

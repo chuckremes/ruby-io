@@ -58,7 +58,7 @@ class IO
 
         def getaddrinfo(hostname:, service:, hints:, timeout: nil)
           Private.setup
-          results = FFI::MemoryPointer.new(:pointer)
+          results = ::FFI::MemoryPointer.new(:pointer)
           result = Internal::Backend::Async.getaddrinfo(hostname: hostname, service: service, hints: hints, results: results, timeout: timeout)
           ptr = results.read_pointer
           structs = []
@@ -89,11 +89,11 @@ class IO
         reply = FCNTL.set_nonblocking(fd: fd) # ignore return code?
 
         @context = if :open == state
-          Internal::States::TCP::Open.new(fd: fd, backend: Internal::Backend::Async, error_policy: nil, parent: self)
+          Internal::States::TCP::Open.new(fd: fd, backend: Internal::Backend::Async, parent: self)
         elsif :connected == state
-          Internal::States::TCP::Connected.new(fd: fd, backend: Internal::Backend::Async, error_policy: nil)
+          Internal::States::TCP::Connected.new(fd: fd, backend: Internal::Backend::Async)
         else
-          Internal::States::TCP::Closed.new(fd: -1, backend: Internal::Backend::Async, error_policy: nil)
+          Internal::States::TCP::Closed.new(fd: -1, backend: Internal::Backend::Async)
         end
       end
 
