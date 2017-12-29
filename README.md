@@ -24,6 +24,7 @@ This project exists to try out some ideas. I expect a few blind alleys before I 
 * Initial IO::Transpose wrapper implementation
 * Sketch out remaining class inheritance and put in stubs (UDP, Pipe, FIFO/NamedPipe, IOCTL, TTY, StringIO)
 * Stub Error/Exception hierarchy
+* Provide hooks for tracking IO statistics like bytes read/written; define API
 
 ## Philosophy
 The current Ruby IO classes are over 20 years old. As a result, they suffer from a few shortcomings. This project hopes to resolve several issues with the current classes.
