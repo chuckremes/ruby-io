@@ -522,26 +522,26 @@ class FDSet < FFI::Struct
     end
   end
 
-  def set(bit_index:)
-    byte_index, nibble_index = indexes(bit_index: bit_index)
-    change(byte_index: byte_index, nibble_index: nibble_index, to_val: 1)
+  def set(fd:)
+    byte_index, bit_index = indexes(index: fd)
+    change(byte_index: byte_index, bit_index: bit_index, to_val: 1)
   end
 
-  def clear(bit_index:)
-    byte_index, nibble_index = indexes(bit_index: bit_index)
-    change(byte_index: byte_index, nibble_index: nibble_index, to_val: 0)
+  def clear(fd:)
+    byte_index, bit_index = indexes(index: fd)
+    change(byte_index: byte_index, bit_index: bit_index, to_val: 0)
   end
 
   private
 
-  def change(byte_index:, nibble_index:, to_val:)
+  def change(byte_index:, bit_index:, to_val:)
     # for algorithm, see:  https://stackoverflow.com/questions/47981/how-do-you-set-clear-and-toggle-a-single-bit
-    self[:descriptor][byte_index] ^= (-to_val ^ self[:descriptor][byte_index]) & (1 << nibble_index);
+    self[:descriptor][byte_index] ^= (-to_val ^ self[:descriptor][byte_index]) & (1 << bit_index);
   end
 
-  def indexes(bit_index:)
-    byte_index = bit_index / 8
-    nibble_index = bit_index % 8
+  def indexes(index:)
+    byte_index = index / 8
+    nibble_index = (index % 8) - 1 # remember to use 0-based indexing
   end
 end
 
