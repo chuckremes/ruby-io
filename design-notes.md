@@ -485,7 +485,18 @@ Makes no sense to create a single-ended pipe. When using `pipe` syscall, it crea
 
 DIRECTORIES
 Many of the current methods on Ruby's Dir seem pointless. Methods like #tell, #read, etc are strange. Might just be my ignorance of the utility of these functions, so research it a bit. 
-For new Dir class, thinking that it won't returns Strings as pathnames. We should also return a URL (universal record locator) object. This will, of course, have a #to_s method on it so someone can get a string if they really want it.
+For new Dir class, thinking that it won't returns Strings as pathnames. We should also return a URL (universal record locator) object. This will, of course, have a #to_s method on it so someone can get a string if they really want it. Dir#each should take keyword args so the programmer can control some behavior.
+For encoding, provide a IO::TransposeDir or similar. Need to figure out that hierarchy.
+Dir.glob is going to be fun to implement in Ruby. Hear there are lots of performance issues so we'll need to be smart and maybe a bit clever.
+
+EACH
+Thinking that this should be supported as a mixin. The module would contain something similar to the Rubinius EachReader class. However, I'm thinking it should be broken down even more granularly so that there is a EachLimitReader, EachSeparatorReader, etc. Not sure this makes sense so pay attention when implementing.
+
+Also, the #each methods should handle buffering. The "limit" readers can pretty easily request the specific number of bytes. The "line" or "separator" readers cannot. They need to read in some PAGE_SIZE quantity and return the lines to the caller. But the extra bytes read should not be thrown away; cache/buffer them locally until we run out and then read more.
+
+Note that TruffleRuby just improved #gets and #each by making sure to only instantiate a single EachReader instead of instantiating a new one to every call to #each. Maybe have a private method __each__ that handles this instatiation and we just call into it from the public facing methods. Again, this will be easier to figure out during implementation.
+
+The Transpose class(es) will provide their own #each methods that work on characters. When reading unicode, we know that 16-byte chars and 32-byte chars always take the same amount of space. Converting from bytes to chars is a simple multiplication. UTF-8 is trickier since a char can be anywhere from 1 to 4 bytes long. To read 80 chars requires reading AT LEAST 80 bytes and perhaps as many as 320 bytes.
 
 
 ## SyncIO::Config
