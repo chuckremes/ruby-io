@@ -15,8 +15,20 @@ This project exists to try out some ideas. I expect a few blind alleys before I 
 * Allow programmer to choose Multithread reporting policy for when using objects across multiple threads: silent, warn, fatal options
 * Move unicode support to the periphery of the IO classes and only incur unicode overhead when the programmer chooses to use it
 
+## Runtime Support
+Tested and works on:
+* MRI 2.4.0, 2.5.0, 2.6.0dev
+* Rubinius 3.87 (minimum required version)
+* TruffleRuby (master)
+
+Fails on:
+* JRuby 9.1.15.0 (filed issue #4920)
+
 ## To Do Before First Public Release as Gem
 * Multithread Policy - implement checks & warnings
+* Async sleep (Timers support)
+* Linux epoll support (so I can confirm and nail down the Poller API).
+  ** Maybe do pure FFI select(2) as well? that is, rewrite macros in Ruby, no C funcs
 * Initial #each implementation
 * Start documentation with examples
 * Hook up Error Policy for return codes and exceptions
