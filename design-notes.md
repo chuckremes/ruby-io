@@ -499,6 +499,52 @@ Note that TruffleRuby just improved #gets and #each by making sure to only insta
 The Transpose class(es) will provide their own #each methods that work on characters. When reading unicode, we know that 16-byte chars and 32-byte chars always take the same amount of space. Converting from bytes to chars is a simple multiplication. UTF-8 is trickier since a char can be anywhere from 1 to 4 bytes long. To read 80 chars requires reading AT LEAST 80 bytes and perhaps as many as 320 bytes.
 
 
+FFI Select & FDSet
+FFI can't wrap macros. Luckily the select(2) macros are fairly simple and the fd_set struct is the same on all platforms. FD_SETSIZE is a max of 1024 and defaults to 64 on some platforms. We'll always allocate 1024.
+
+class FDSet < FFI::Struct
+  layout \
+    descriptors, [:uint8, 1024 / 8]
+
+  def set?(bit_index:)
+    byte_index, nibble_index = indexes(bit_index: bit_index)
+    byte = self[:descriptors][byte_index]
+
+    case nibble_index
+    when 0; byte & 0x1
+    when 1; byte & 0x2
+    when 2; byte & 0x3
+    when 3; byte & 0x4
+    when 4; byte & 0x5
+    when 5; byte & 0x6
+    when 6; byte & 0x7
+    when 7; byte & 0x8
+    end
+  end
+
+  def set(bit_index:)
+    byte_index, nibble_index = indexes(bit_index: bit_index)
+    change(byte_index: byte_index, nibble_index: nibble_index, to_val: 1)
+  end
+
+  def clear(bit_index:)
+    byte_index, nibble_index = indexes(bit_index: bit_index)
+    change(byte_index: byte_index, nibble_index: nibble_index, to_val: 0)
+  end
+
+  private
+
+  def change(byte_index:, nibble_index:, to_val:)
+    # for algorithm, see:  https://stackoverflow.com/questions/47981/how-do-you-set-clear-and-toggle-a-single-bit
+    self[:descriptor][byte_index] ^= (-to_val ^ self[:descriptor][byte_index]) & (1 << nibble_index);
+  end
+
+  def indexes(bit_index:)
+    byte_index = bit_index / 8
+    nibble_index = bit_index % 8
+  end
+end
+
 ## SyncIO::Config
 
 API for creating configuration objects used to open new IO streams. A file can be specified by either a path or a file descriptor (but not both). Similarly, files can be opened in different modes and with different flags. Rather than try to design a method to handle all of these different combinations (with its attendant complex method signature) we provide a configuration object facility which enforces the appropriate rules.
