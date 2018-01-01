@@ -34,9 +34,14 @@ Fails on:
 * Hook up Error Policy for return codes and exceptions
 * Modify all methods to return a Result object instead of an array or hash
 * Initial IO::Transpose wrapper implementation
-* Sketch out remaining class inheritance and put in stubs (UDP, Pipe, FIFO/NamedPipe, IOCTL, TTY, StringIO)
+* Sketch out remaining class inheritance and put in stubs (UDP, Pipe, RAW, FIFO/NamedPipe, IOCTL, TTY, StringIO, Stat, Utils)
 * Stub Error/Exception hierarchy
 * Provide hooks for tracking IO statistics like bytes read/written; define API
+* Change Platforms module to POSIX?
+  ** Should consider also supporting some functions that are platform-specific in its own namespace. Thinking of #writev and copy_file_range(2) which are not part of POSIX.
+
+## Longer Term Fixes
+* Ruby bug https://bugs.ruby-lang.org/issues/9664 prevents a fiber that has ever been transferred from yielding or resuming. This makes supporting Enumerators impossible. Generally speaking, it makes supporting any other Fiber-aware code very problematic because most code in the wild uses yield/resume instead of transfer.
 
 ## Philosophy
 The current Ruby IO classes are over 20 years old. As a result, they suffer from a few shortcomings. This project hopes to resolve several issues with the current classes.
