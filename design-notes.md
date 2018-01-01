@@ -511,14 +511,14 @@ class FDSet < FFI::Struct
     byte = self[:descriptors][byte_index]
 
     case nibble_index
-    when 0; byte & 0x1
-    when 1; byte & 0x2
-    when 2; byte & 0x3
-    when 3; byte & 0x4
-    when 4; byte & 0x5
-    when 5; byte & 0x6
-    when 6; byte & 0x7
-    when 7; byte & 0x8
+    when 0; byte & 0b00000001
+    when 1; byte & 0b00000010
+    when 2; byte & 0b00000100
+    when 3; byte & 0b00001000
+    when 4; byte & 0b00010000
+    when 5; byte & 0b00100000
+    when 6; byte & 0b01000000
+    when 7; byte & 0b10000000
     end
   end
 
