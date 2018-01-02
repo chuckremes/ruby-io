@@ -36,6 +36,7 @@ class IO
       require_relative 'bsd/poller'
     elsif ::FFI::Platform::IS_LINUX
       require_relative 'linux/ffi'
+      require_relative 'linux/poller'
     else
       # Can setup select(2) or poll(2) here as a backup for kqueue(2) and epoll(2)
     end
