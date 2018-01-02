@@ -7,8 +7,9 @@ class IO
       # total timeout.
       def self.sleep(seconds: 0, milliseconds: 0, nanoseconds: 0)
         Private.setup
-        @timeout = (seconds * 1_000) + milliseconds + (nanoseconds / 1_000)
-        Internal::Backend::Async.timer(duration: @timeout)
+        @timeout_ms = (seconds * 1_000) + milliseconds + (nanoseconds / 1_000)
+        reply = Internal::Backend::Async.timer(duration: @timeout_ms)
+        reply[:actual_duration]
       end
     end
 

@@ -149,11 +149,12 @@ class IO
           end
 
           def timer(duration:)
+            start = Time.now.to_f
             reply = build_timer_request(duration: duration, repeat: false) do |fiber|
               build_command(fiber) do
-                # return empty hash to receive :fiber key;
-                # necessary so correct fiber can be resumed/transferred from caller
-                {}
+                {
+                  actual_duration: (Time.now.to_f - start)
+                }
               end
             end
 
