@@ -503,6 +503,7 @@ FFI Select & FDSet
 FFI can't wrap macros. Luckily the select(2) macros are fairly simple and the fd_set struct is the same on all platforms. FD_SETSIZE is a max of 1024 and defaults to 64 on some platforms. We'll always allocate 1024.
 
 class FDSet < FFI::Struct
+  # Not sure how the bits are laid out in memory, so some experimentation will be necessary
   layout \
     descriptors, [:uint8, 1024 / 8]
 
@@ -544,6 +545,13 @@ class FDSet < FFI::Struct
     nibble_index = (index % 8) - 1 # remember to use 0-based indexing
   end
 end
+
+ASYNC SLEEP & TIMERS
+Here's how it should work...
+* a call to Kernel#sleep (which has been monkey-patched) will essentially call Async.sleep(duration)
+* Async.sleep calls Internal::Backend::Async.build_timer_request which gets passed to the IOLoop.
+* IOLoop processes the timer request and passes it to the Poller. Some pollers like KqueuePoller know how to directly deal with timers and can create one. Use this facility if available. For SelectPoller, we'll need to maintain a sorted list of timers and utilize the select(2) timeout facility for triggering timer events. Note that select will return if any registered event is ready on a watched FD, so we might wake up before a timer is set to fire. In that case, we need to calculate the remaining sleep time and block again.
+* The timer request takes a closure just like other async requests (read, write, etc). When timer fires, execute the closure. In most cases this will be an empty / nil closure so its purpose will be to wake up the originating fiber.
 
 ## SyncIO::Config
 
