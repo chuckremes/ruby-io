@@ -25,11 +25,26 @@ class IO
         @change_count = 0
         @read_callbacks = {}
         @write_callbacks = {}
+        @timer_callbacks = {}
         Logger.debug(klass: self.class, name: 'kqueue poller', message: 'kqueue allocated!')
       end
 
       def max_allowed
         MAX_EVENTS
+      end
+
+      def register_timer(duration:, request:)
+        @timer_callbacks[request.object_id] = request
+        register(
+          fd: 1,
+          request: request,
+          filter: Constants::EVFILT_TIMER,
+          flags: Constants::EV_ADD | Constants::EV_ENABLE | Constants::EV_ONESHOT,
+          fflags: Constants::NOTE_MSECONDS,
+          data: duration,
+          udata: request.object_id
+        )
+        Logger.debug(klass: self.class, name: 'kqueue poller', message: "registered for timer, object_id [#{request.object_id}]")
       end
 
       def register_read(fd:, request:)
@@ -77,40 +92,46 @@ class IO
         elsif event.filter == Constants::EVFILT_WRITE
           process_write_event(event: event)
         elsif event.filter == Constants::EVFILT_TIMER
+          process_timer_event(event: event)
         else
           raise "Fatal: unknown event flag [#{event.flags}]"
         end
       end
 
       def process_read_event(event:)
-        execute_callback(event: event, callbacks: @read_callbacks, kind: 'READ')
+        execute_callback(event: event, identity: event.ident, callbacks: @read_callbacks, kind: 'READ')
       end
 
       def process_write_event(event:)
-        execute_callback(event: event, callbacks: @write_callbacks, kind: 'WRITE')
+        execute_callback(event: event, identity: event.ident, callbacks: @write_callbacks, kind: 'WRITE')
       end
 
-      def execute_callback(event:, callbacks:, kind:)
-        Logger.debug(klass: self.class, name: 'kqueue poller', message: "execute [#{kind}] callback for fd [#{event.ident}]")
+      def process_timer_event(event:)
+        execute_callback(event: event, identity: event.udata, callbacks: @timer_callbacks, kind: 'TIMER')
+      end
+
+      def execute_callback(event:, identity:, callbacks:, kind:)
+        Logger.debug(klass: self.class, name: 'kqueue poller', message: "execute [#{kind}] callback for fd [#{identity}]")
         p event
-        block = callbacks.delete(event.ident)
+        block = callbacks.delete(identity)
         if block
           block.call
         else
-          raise "Got [#{kind}] event for fd [#{event.ident}] with no registered callback"
+          raise "Got [#{kind}] event for fd [#{identity}] with no registered callback"
         end
       end
 
-      def register(fd:, request:, filter:, flags:)
+      def register(fd:, request:, filter:, flags:, fflags: 0, data: 0, udata: nil)
         event = @events[@change_count]
         event.ev_set(
           ident: fd,
           filter: filter,
           flags: flags,
-          fflags: 0,
-          data: 0,
-          udata: nil
+          fflags: fflags,
+          data: data,
+          udata: udata
         )
+        p event, Time.now.to_f
         @change_count += 1
       end
     end

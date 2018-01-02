@@ -148,6 +148,18 @@ class IO
             reply
           end
 
+          def timer(duration:)
+            reply = build_timer_request(duration: duration, repeat: false) do |fiber|
+              build_command(fiber) do
+                # return empty hash to receive :fiber key;
+                # necessary so correct fiber can be resumed/transferred from caller
+                {}
+              end
+            end
+
+            reply
+          end
+
           #
           # Helpers for building the asynchronous requests
           #
@@ -173,6 +185,14 @@ class IO
               yield(fiber)
             end
           
+            reply = enqueue(request)
+          end
+
+          def build_timer_request(repeat:, duration:)
+            request = IO::Async::Private::Request::NonblockingTimerCommand.new(fiber: Fiber.current, duration: duration) do |fiber|
+              yield(fiber)
+            end
+
             reply = enqueue(request)
           end
 

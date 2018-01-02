@@ -27,7 +27,7 @@ class IO
         :flags, :uint16,
         :fflags, :uint32,
         :data, :uintptr_t,
-        :udata, :pointer
+        :udata, :uint64
 
       def self.ev_set(kev_struct:, ident:, filter:, flags:, fflags:, data:, udata:)
         kev_struct[:ident] = ident
@@ -49,13 +49,14 @@ class IO
           udata: udata
         )
       end
-      
+
       def ident(); self[:ident]; end
       def filter(); self[:filter]; end
       def flags(); self[:flags]; end
       def fflags(); self[:fflags]; end
       def data(); self[:data]; end
-      
+      def udata(); self[:udata]; end
+
       def inspect
         string = "[\n"
         string += "  ident:  #{ident}\n"
@@ -108,6 +109,12 @@ class IO
       # EVFILT_READ specific flags
       EV_POLL   = EV_FLAG0
       EV_OOBAND = EV_FLAG1
+
+      # EVFILT_TIMER specific flags
+      NOTE_SECONDS  = 0x00000001  # data is seconds
+      NOTE_USECONDS = 0x00000002  # data is microseconds
+      NOTE_MSECONDS = 0x00000000  # data is milliseconds (default!)
+      NOTE_NSECONDS = 0x00000004  # data is nanoseconds
     end
 
     class KFilters

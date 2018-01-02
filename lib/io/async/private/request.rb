@@ -57,6 +57,18 @@ class IO
             poller.register_write(fd: @fd, request: @command)
           end
         end
+
+        class NonblockingTimerCommand < NonblockingCommand
+          def initialize(fiber:, duration:, &blk)
+            @fd = nil
+            @duration = duration
+            super(fiber: fiber, fd: nil, &blk)
+          end
+
+          def register(poller:)
+            poller.register_timer(duration: @duration, request: @command)
+          end
+        end
                 
         # Basic Request struct. Tracks the requesting Fiber, request number,
         # any associated command timeout, and the command struct. The

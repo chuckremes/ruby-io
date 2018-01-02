@@ -29,6 +29,7 @@ require_relative 'io/config/mode'
 # async
 require_relative 'io/internal/backend/async'
 require_relative 'io/async/private/private'
+require_relative 'io/async/timer'
 require_relative 'io/async/fcntl'
 require_relative 'io/async/file'
 require_relative 'io/async/tcp'
