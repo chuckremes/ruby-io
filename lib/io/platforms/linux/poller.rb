@@ -29,6 +29,7 @@ class IO
         @timer_callbacks = {}
         @readers = Set.new
         @writers = Set.new
+        @timers = Common::Timers.new
         Logger.debug(klass: self.class, name: 'epoll poller', message: 'epoll allocated!')
       end
 
@@ -37,17 +38,7 @@ class IO
       end
 
       def register_timer(duration:, request:)
-#        @timer_callbacks[request.object_id] = request
-#        register(
-#          fd: 1,
-#          request: request,
-#          filter: Constants::EVFILT_TIMER,
-#          flags: Constants::EV_ADD | Constants::EV_ENABLE | Constants::EV_ONESHOT,
-#          fflags: Constants::NOTE_MSECONDS,
-#          data: duration,
-#          udata: request.object_id
-#        )
-#        Logger.debug(klass: self.class, name: 'kqueue poller', message: "registered for timer, object_id [#{request.object_id}]")
+        @timers.add_oneshot(delay: duration, callback: request)
       end
 
       def register_read(fd:, request:)
@@ -79,12 +70,13 @@ class IO
       # Waits for epoll events. We can receive up to MAX_EVENTS in reponse.
       def poll
         Logger.debug(klass: self.class, name: 'epoll_wait poller', message: 'calling epoll_wait')
-        rc = Platforms.epoll_wait(@epoll_fd, @events[0], MAX_EVENTS, SHORT_TIMEOUT)
+        rc = Platforms.epoll_wait(@epoll_fd, @events[0], MAX_EVENTS, shortest_timeout)
         @change_count = 0
         Logger.debug(klass: self.class, name: 'epoll poller', message: "epoll_wait returned [#{rc}] events!")
 
         if rc >= 0
           rc.times { |index| process_event(event: @events[index]) }
+          @timers.fire_expired
         else
           Logger.debug(klass: self.class, name: 'epoll_wait poller', message: "rc [#{rc}], errno [#{::FFI.errno}]")
         end
@@ -129,13 +121,16 @@ class IO
 
       def register(fd:, filter:, operation:)
         event = @events[@change_count]
-        event.setup(
-          fd: fd,
-          events: filter
-        )
+        event.setup(fd: fd, events: filter)
         rc = Platforms.epoll_ctl(@epoll_fd, operation, fd, event)
         raise "Fatal error, epoll_ctl returned [#{rc}], errno [#{::FFI.errno}]" if rc < 0
         @change_count += 1
+      end
+
+      def shortest_timeout
+        delay_ms = @timers.wait_interval.to_i
+        delay_ms = 50 if delay_ms.zero?
+        delay_ms
       end
     end
 

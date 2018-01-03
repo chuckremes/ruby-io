@@ -1,3 +1,5 @@
+require_relative 'select'
+
 class IO
   module Platforms
 
@@ -5,12 +7,10 @@ class IO
     # called to process the +fd+.
     #
     # Not re-entrant or thread-safe. This class assumes it is called from a single
-    # thread in a serialized fashion. It maintains it's change_count internally
-    # so parallel calls would likely corrupt the changelist.
+    # thread in a serialized fashion.
     class SelectPoller
-      MAX_EVENTS = 10
-      NO_TIMEOUT = TimeSpecStruct.new
-      SHORT_TIMEOUT = TimeSpecStruct.new.tap { |ts| ts[:tv_nsec] = 1 }
+      NO_TIMEOUT = TimeValStruct.new
+      SHORT_TIMEOUT = TimeValStruct.new.tap { |ts| ts[:tv_usec] = 1 }
 
       def initialize
         @read_master_set   = FDSetStruct.new
@@ -20,6 +20,8 @@ class IO
 
         @read_callbacks = {}
         @write_callbacks = {}
+        @timeval = TimeValStruct.new
+        @timers = Common::Timers.new
         Logger.debug(klass: self.class, name: 'select poller', message: 'poller allocated!')
       end
 
@@ -28,17 +30,7 @@ class IO
       end
 
       def register_timer(duration:, request:)
-        #        @timer_callbacks[request.object_id] = request
-        #        register(
-        #          fd: 1,
-        #          request: request,
-        #          filter: Constants::EVFILT_TIMER,
-        #          flags: Constants::EV_ADD | Constants::EV_ENABLE | Constants::EV_ONESHOT,
-        #          fflags: Constants::NOTE_MSECONDS,
-        #          data: duration,
-        #          udata: request.object_id
-        #        )
-        #        Logger.debug(klass: self.class, name: 'kqueue poller', message: "registered for timer, object_id [#{request.object_id}]")
+        @timers.add_oneshot(delay: duration, callback: request)
       end
 
       def register_read(fd:, request:)
@@ -65,7 +57,7 @@ class IO
 
         max_fd = [@read_master_set.max_fd, @write_master_set.max_fd].max
 
-        rc = Platforms.select(max_fd + 1, read_working_set, write_working_set, nil, SHORT_TIMEOUT)
+        rc = Platforms.select(max_fd + 1, read_working_set, write_working_set, nil, shortest_timeout)
         Logger.debug(klass: self.class, name: 'select poller', message: "select returned [#{rc}] events!")
 
         if rc >= 0
@@ -84,6 +76,8 @@ class IO
             callbacks: @write_callbacks,
             kind: 'WRITE'
           )
+
+          @timers.fire_expired
         else
           Logger.debug(klass: self.class, name: 'select poller', message: "rc [#{rc}], errno [#{::FFI.errno}]")
         end
@@ -113,6 +107,26 @@ class IO
         else
           raise "Got [#{kind}] event for fd [#{identity}] with no registered callback"
         end
+      end
+
+      # Calculate the shortest timeout based upon the timer nearest to firing.
+      # Returns a TimeVal struct.
+      #
+      # If no timers exist, then this would return a zero timespec which could
+      # lead to a busy loop. Enforce some minimum sleep time of around 50ms.
+      #
+      def shortest_timeout
+        delay_ms = @timers.wait_interval.to_i
+
+        delay_ms = 50 if delay_ms.zero?
+
+        # convert to seconds and microseconds
+        seconds = delay_ms / 1_000
+        microseconds = (delay_ms % 1_000) * 1_000
+
+        @timeval[:tv_sec] = seconds
+        @timeval[:tv_usec] = microseconds
+        @timeval
       end
     end
 

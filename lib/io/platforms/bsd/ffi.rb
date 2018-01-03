@@ -9,8 +9,13 @@ class IO
     #
     # BSD-specific functions
     #
-    attach_function :kqueue, [], :int, :blocking => true
-    attach_function :kevent, [:int, :pointer, :int, :pointer, :int, :pointer], :int, :blocking => true
+    begin
+      attach_function :kqueue, [], :int, :blocking => true
+      attach_function :kevent, [:int, :pointer, :int, :pointer, :int, :pointer], :int, :blocking => true
+    rescue ::FFI::NotFoundError
+      # fallback to using select(2)
+      require_relative '../common/poller'
+    end
 
     #    struct kevent {
     #            uintptr_t       ident;          /* identifier for this event */

@@ -25,7 +25,8 @@ class IO
         @change_count = 0
         @read_callbacks = {}
         @write_callbacks = {}
-        @timer_callbacks = {}
+        @timers = Common::Timers.new
+        @timespec = TimeSpecStruct.new
         Logger.debug(klass: self.class, name: 'kqueue poller', message: 'kqueue allocated!')
       end
 
@@ -34,7 +35,7 @@ class IO
       end
 
       def register_timer(duration:, request:)
-        @timer_callbacks[request.object_id] = request
+        timer = @timers.add_oneshot(delay: duration, callback: request)
         register(
           fd: 1,
           request: request,
@@ -42,7 +43,7 @@ class IO
           flags: Constants::EV_ADD | Constants::EV_ENABLE | Constants::EV_ONESHOT,
           fflags: Constants::NOTE_MSECONDS,
           data: duration,
-          udata: request.object_id
+          udata: timer.object_id
         )
         Logger.debug(klass: self.class, name: 'kqueue poller', message: "registered for timer, object_id [#{request.object_id}]")
       end
@@ -73,7 +74,7 @@ class IO
       # in the changelist before we flush to +kevent+.
       def poll
         Logger.debug(klass: self.class, name: 'kqueue poller', message: 'calling kevent')
-        rc = Platforms.kevent(@kq_fd, @events[0], @change_count, @events[0], MAX_EVENTS, SHORT_TIMEOUT)
+        rc = Platforms.kevent(@kq_fd, @events[0], @change_count, @events[0], MAX_EVENTS, shortest_timeout)
         @change_count = 0
         Logger.debug(klass: self.class, name: 'kqueue poller', message: "kevent returned [#{rc}] events!")
 
@@ -107,7 +108,8 @@ class IO
       end
 
       def process_timer_event(event:)
-        execute_callback(event: event, identity: event.udata, callbacks: @timer_callbacks, kind: 'TIMER')
+        @timers.fire_expired
+        #execute_callback(event: event, identity: event.udata, callbacks: @timer_callbacks, kind: 'TIMER')
       end
 
       def execute_callback(event:, identity:, callbacks:, kind:)
@@ -121,7 +123,7 @@ class IO
         end
       end
 
-      def register(fd:, request:, filter:, flags:, fflags: 0, data: 0, udata: nil)
+      def register(fd:, request:, filter:, flags:, fflags: 0, data: 0, udata: 0)
         event = @events[@change_count]
         event.ev_set(
           ident: fd,
@@ -133,6 +135,20 @@ class IO
         )
 
         @change_count += 1
+      end
+
+      def shortest_timeout
+        delay_ms = @timers.wait_interval.to_i
+
+        delay_ms = 50 if delay_ms.zero?
+
+        # convert to local units
+        seconds = delay_ms / 1_000
+        nanoseconds = (delay_ms % 1_000) * 1_000_000
+
+        @timespec[:tv_sec] = seconds
+        @timespec[:tv_nsec] = nanoseconds
+        @timespec
       end
     end
 
