@@ -22,13 +22,15 @@ Tested and works on:
 * TruffleRuby (master)
 
 Fails on:
-* JRuby 9.1.15.0 (filed issue #4920)
+* JRuby 9.1.15.0 (filed issue #4920; now fixed in master)
+
+## Platform Support
+Tested and working on:
+* OSX 10.12.6 and 10.13.2 (native kqueue support)
+* Linux kernel 4.13 (native epoll support)
+
 
 ## To Do Before First Public Release as Gem
-* Multithread Policy - implement checks & warnings
-* Async sleep (Timers support)
-* Linux epoll support (so I can confirm and nail down the Poller API).
-  ** Maybe do pure FFI select(2) as well? that is, rewrite macros in Ruby, no C funcs
 * Initial #each implementation
 * Start documentation with examples
 * Hook up Error Policy for return codes and exceptions
@@ -36,9 +38,16 @@ Fails on:
 * Initial IO::Transpose wrapper implementation
 * Sketch out remaining class inheritance and put in stubs (UDP, Pipe, RAW, FIFO/NamedPipe, IOCTL, TTY, StringIO, Stat, Utils)
 * Stub Error/Exception hierarchy
+
+## To Do
 * Provide hooks for tracking IO statistics like bytes read/written; define API
+* Implement self-pipe trick so fiber loops can wake IOLoop when posting to its mailbox
 * Change Platforms module to POSIX?
   ** Should consider also supporting some functions that are platform-specific in its own namespace. Thinking of #writev and copy_file_range(2) which are not part of POSIX.
+* Modify async `close` so that registered FDs are deregistered explicitly from Poller, callbacks removed, etc.
+* Hook up `timeout:` arg in async methods so it actually does something
+* Get real atomic reference support for main Rubies instead of current hack
+* Expose a `poller` object for both Sync and Async classes; not sure what this would look like yet but suggest it delegates all read/write registration to actual Poller instance (for Async). For Sync, not sure.
 
 ## Longer Term Fixes
 * Ruby bug https://bugs.ruby-lang.org/issues/9664 prevents a fiber that has ever been transferred from yielding or resuming. This makes supporting Enumerators impossible. Generally speaking, it makes supporting any other Fiber-aware code very problematic because most code in the wild uses yield/resume instead of transfer.
