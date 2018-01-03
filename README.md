@@ -48,6 +48,7 @@ Tested and working on:
 * Hook up `timeout:` arg in async methods so it actually does something
 * Get real atomic reference support for main Rubies instead of current hack
 * Expose a `poller` object for both Sync and Async classes; not sure what this would look like yet but suggest it delegates all read/write registration to actual Poller instance (for Async). For Sync, not sure.
+* Need a supportable way to generate FFI structs for all major target platforms; considering c2ffi project (on github) but the ruby-c2ffi needs a bunch of fixes.
 
 ## Longer Term Fixes
 * Ruby bug https://bugs.ruby-lang.org/issues/9664 prevents a fiber that has ever been transferred from yielding or resuming. This makes supporting Enumerators impossible. Generally speaking, it makes supporting any other Fiber-aware code very problematic because most code in the wild uses yield/resume instead of transfer.
