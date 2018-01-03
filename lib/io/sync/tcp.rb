@@ -10,7 +10,7 @@ class IO
       class << self
         def open(domain:, type:, protocol:)
           result = Internal::Backend::Sync.socket(domain: domain, type: type, protocol: protocol, timeout: nil)
-          p result
+
           if result[:rc] > 0
             if Platforms::PF_INET == domain
               TCP4.new(fd: result[:rc])

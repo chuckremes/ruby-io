@@ -229,7 +229,6 @@ class IO
         # so we can abstract out this work
         sin_addr_ptr = Platforms.address_of(struct: self, field: :sin_addr)
         hsh = Platforms::Functions.inet_ntop(self[:sin_family], sin_addr_ptr, str, str.size)
-        #p hsh
         hsh[:rc]
       end
 
@@ -274,7 +273,6 @@ class IO
         # so we can abstract out this work
         sin_addr_ptr = Platforms.address_of(struct: self, field: :sin6_addr)
         hsh = Platforms::Functions.inet_ntop(self[:sin6_family], sin_addr_ptr, str, str.size)
-        #p hsh
         hsh[:rc]
       end
 

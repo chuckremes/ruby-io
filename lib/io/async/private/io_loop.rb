@@ -17,7 +17,6 @@ class IO
         def initialize
           Logger.debug(klass: self.class, name: :new, message: 'allocating')
           @poller = Internal::Backend::Async::Poller.new
-          p @poller
           @system_inbox = Mailbox.new
 
           # Store the mailboxes from all registered Fiber Schedulers. Command

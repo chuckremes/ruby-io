@@ -93,7 +93,6 @@ class IO
       private
 
       def process_event(event:)
-        p event
         if event.read?
           process_read_event(event: event)
         elsif event.write?
@@ -119,7 +118,7 @@ class IO
 
       def execute_callback(event:, identity:, callbacks:, kind:)
         Logger.debug(klass: self.class, name: 'kqueue poller', message: "execute [#{kind}] callback for fd [#{identity}]")
-        p event
+
         block = callbacks.delete(identity)
         if block
           block.call

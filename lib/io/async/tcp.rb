@@ -11,7 +11,7 @@ class IO
         def open(domain:, type:, protocol:, timeout: nil)
           Private.setup
           result = Internal::Backend::Async.socket(domain: domain, type: type, protocol: protocol, timeout: timeout)
-          p result
+
           if result[:rc] > 0
             if Platforms::PF_INET == domain
               TCP4.new(fd: result[:rc])
@@ -62,7 +62,7 @@ class IO
           result = Internal::Backend::Async.getaddrinfo(hostname: hostname, service: service, hints: hints, results: results, timeout: timeout)
           ptr = results.read_pointer
           structs = []
-          p result
+
           return structs if result[:rc] < 0 || ptr.nil?
 
           begin

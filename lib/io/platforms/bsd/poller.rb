@@ -112,7 +112,7 @@ class IO
 
       def execute_callback(event:, identity:, callbacks:, kind:)
         Logger.debug(klass: self.class, name: 'kqueue poller', message: "execute [#{kind}] callback for fd [#{identity}]")
-        p event
+
         block = callbacks.delete(identity)
         if block
           block.call
@@ -131,7 +131,7 @@ class IO
           data: data,
           udata: udata
         )
-        p event, Time.now.to_f
+
         @change_count += 1
       end
     end

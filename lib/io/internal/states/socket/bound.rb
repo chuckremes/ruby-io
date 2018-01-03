@@ -51,7 +51,6 @@ class IO
             addrlen = Platforms::SockLenStruct.new
             addrlen[:socklen] = addr.size
             results = @backend.accept(fd: @fd, addr: addr, addrlen: addrlen, timeout: timeout)
-            p results
 
             if results[:rc] < 0
               [results[:rc], results[:errno], nil]
