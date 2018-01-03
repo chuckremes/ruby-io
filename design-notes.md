@@ -498,6 +498,52 @@ Note that TruffleRuby just improved #gets and #each by making sure to only insta
 
 The Transpose class(es) will provide their own #each methods that work on characters. When reading unicode, we know that 16-byte chars and 32-byte chars always take the same amount of space. Converting from bytes to chars is a simple multiplication. UTF-8 is trickier since a char can be anywhere from 1 to 4 bytes long. To read 80 chars requires reading AT LEAST 80 bytes and perhaps as many as 320 bytes.
 
+The methods in original Ruby IO that support enumeration of the IO stream are:
+IO.foreach
+IO.readlines
+IO#each
+IO#each_byte
+IO#each_char
+IO#each_codepoint
+IO#each_line
+IO#getbyte
+IO#getc
+IO#gets
+IO#readbyte
+IO#readchar
+IO#readline
+IO#readlines
+IO#ungetbyte
+IO#ungetc
+
+Several of these are duplicates of each other and differ only in how EOF is handled (return empty string or raise EOFError). Additionally, several of them take in multiple options depending on their position in the method argument list (each, readlines). Lastly, some methods differ in that they update a global variable after each line (or not).
+
+First, let's separate out the byte-level enumeration from character/string enumeration. These byte-level operations should properly be part of the main enumeration mixin.
+IO#each, IO#each_byte, IO#getbyte, IO#readbyte, IO#ungetbyte
+
+The Transpose enumeration mixin should support the remaining ideas but with a simplified keyword-aware interface.
+IO.readlines, IO#each_char, IO#each_codepoint, IO#each_line, IO#getc, IO#gets, IO#readchar, IO#readline, IO#readlines, IO#ungetc
+
+The basis of all is IO#each. In current Ruby, IO#each works on lines/strings. For a system that works with ASCII_8BIT this kind of doesn't make sense. Let's suggest that #each only works on bytes and will read those bytes with some +limit+. The other methods can compose their operations on top of the work that #each performs.
+
+def each(offset:, limit:)
+  ...
+end
+
+def each_byte(offset:)
+  each(offset: offset, limit: 1) { |byte| yield(byte) }
+end
+
+The above looks nice, but those in the know will see a performance problem. There will be lots of method overhead to read a single byte at a time from a stream. Since we always specify the starting offset, the #each method could intelligently buffer data internally. It will maintain state local to its own method. We might waste some effort reading more than we need to read but that will be neglible over time. Anyone who is truly worried about that can just issue #read(offset:, length:) commands directly which will do NO buffering.
+
+Note that by maintaining state within the method we are disallowing some tricks used by Rubinius (and other runtimes?) wherein they mimicked IO#gets by calling IO#each with a block and returning directly from within the block. This would screw up #each's internal bookkeeping so we need to do better.
+
+The methods #getbyte and #readbyte are superfluous. They are just #read(limit: 1, offset: ?). If someone needs to read a string of bytes and process them, they should use #each_byte for that purpose or call #read directly.
+
+IO#ungetbyte has very strange semantics. Will not be supported.
+
+So for basic enumeration, we are left with #each(limit:, offset:), and each_byte(offset:).
+
 
 FFI Select & FDSet
 FFI can't wrap macros. Luckily the select(2) macros are fairly simple and the fd_set struct is the same on all platforms. FD_SETSIZE is a max of 1024 and defaults to 64 on some platforms. We'll always allocate 1024.
