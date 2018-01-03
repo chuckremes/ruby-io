@@ -43,7 +43,6 @@ class IO
 
       def register_read(fd:, request:)
         @read_callbacks[fd] = request
-        add_or_modify = @readers.member?(fd) ? Constants::EPOLL_CTL_MODIFY : Constants::EPOLL_CTL_ADD
 
         register(
           fd: fd,
@@ -56,7 +55,6 @@ class IO
 
       def register_write(fd:, request:)
         @write_callbacks[fd] = request
-        add_or_modify = @readers.member?(fd) ? Constants::EPOLL_CTL_MODIFY : Constants::EPOLL_CTL_ADD
 
         register(
           fd: fd,
@@ -116,6 +114,20 @@ class IO
           block.call
         else
           raise "Got [#{kind}] event for fd [#{identity}] with no registered callback"
+        end
+      end
+
+      # If an FD has already been registered, registering it a second time with CTL_ADD
+      # returns errno 17 / EEXIST. Must modify existing FDs instead.
+      #
+      # FIXME: When an FD is closed, need a way to detect that and remove from Poller.
+      # Otherwise, we'll have FDs registered that should not be and will likely return
+      # errors at bad moments.
+      def add_or_modify(fd:)
+        if @readers.member?(fd) || @writers.member?(fd)
+          Constants::EPOLL_CTL_MOD
+        else
+          Constants::EPOLL_CTL_ADD
         end
       end
 
