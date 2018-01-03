@@ -1,3 +1,5 @@
+require 'set'
+
 class IO
   module Platforms
     #
@@ -24,50 +26,80 @@ class IO
     attach_function :select, [:int, :pointer, :pointer, :pointer, :pointer], :int, :blocking => true
 
     class FDSetStruct < ::FFI::Struct
+      include Enumerable
+
       layout \
         :bytes, [:uint8, Constants::FDSET_SIZE / 8]
 
-      attr_accessor :max_fd
+      attr_accessor :on
 
       def initialize(*args)
         super
-        @max_fd = 0
+        @on = SortedSet.new
       end
 
-      def copy
-        obj = FDSetStruct.new
+      def each
+        @on.to_a.each { |fd| yield(fd) }
+      end
+
+      def copy_to(copy:)
         (Constants::FDSET_SIZE / 8).times do |i|
-          obj[:bytes][i] = self[:bytes][i]
+          copy[:bytes][i] = self[:bytes][i]
         end
-        obj.max_fd = self.max_fd
-        obj
+        copy.on = self.on
+        copy
       end
 
       def set?(fd:)
         byte_index, bit_index = indexes(fd: fd)
         byte = self[:bytes][byte_index]
 
-        case bit_index
-        when 0; (byte & Constants::FD_BIT0) > 0
-        when 1; (byte & Constants::FD_BIT1) > 0
-        when 2; (byte & Constants::FD_BIT2) > 0
-        when 3; (byte & Constants::FD_BIT3) > 0
-        when 4; (byte & Constants::FD_BIT4) > 0
-        when 5; (byte & Constants::FD_BIT5) > 0
-        when 6; (byte & Constants::FD_BIT6) > 0
-        when 7; (byte & Constants::FD_BIT7) > 0
+        bitmatch = case bit_index
+        when 0; (byte & Constants::FD_BIT0)
+        when 1; (byte & Constants::FD_BIT1)
+        when 2; (byte & Constants::FD_BIT2)
+        when 3; (byte & Constants::FD_BIT3)
+        when 4; (byte & Constants::FD_BIT4)
+        when 5; (byte & Constants::FD_BIT5)
+        when 6; (byte & Constants::FD_BIT6)
+        when 7; (byte & Constants::FD_BIT7)
         end
+
+        bitmatch > 0
       end
 
       def set(fd:)
-        @max_fd = fd > @max_fd ? fd : @max_fd
+        @on.add(fd)
         byte_index, bit_index = indexes(fd: fd)
         change(byte_index: byte_index, bit_index: bit_index, to_val: 1)
       end
 
       def clear(fd:)
+        @on.delete(fd)
         byte_index, bit_index = indexes(fd: fd)
         change(byte_index: byte_index, bit_index: bit_index, to_val: 0)
+      end
+
+      def max_fd
+        @on.max || -1
+      end
+
+      def inspect
+        string = "[\n"
+        i = 0
+        begin
+          string += "  " + sprintf("%08b", self[:bytes][i]).reverse + ' | '
+          string += "  " + sprintf("%08b", self[:bytes][i + 1]).reverse + ' | '
+          string += "  " + sprintf("%08b", self[:bytes][i + 2]).reverse + ' | '
+          string += "  " + sprintf("%08b", self[:bytes][i + 3]).reverse + ' | '
+          string += "  " + sprintf("%08b", self[:bytes][i + 4]).reverse + ' | '
+          string += "  " + sprintf("%08b", self[:bytes][i + 5]).reverse + ' | '
+          string += "  " + sprintf("%08b", self[:bytes][i + 6]).reverse + ' | '
+          string += "  " + sprintf("%08b", self[:bytes][i + 7]).reverse + "\n"
+          i += 8
+        end while i < (Constants::FDSET_SIZE / 8)
+        string += "]\n"
+        string
       end
 
       private
@@ -81,20 +113,6 @@ class IO
         byte_index = fd / 8
         bit_index = (fd % 8)
         [byte_index, bit_index]
-      end
-
-      def inspect
-        string = "[\n"
-        i = 0
-        begin
-          string += "  " + sprintf("%08b", self[:bytes][i]).reverse + ' | '
-          string += "  " + sprintf("%08b", self[:bytes][i + 1]).reverse + ' | '
-          string += "  " + sprintf("%08b", self[:bytes][i + 2]).reverse + ' | '
-          string += "  " + sprintf("%08b", self[:bytes][i + 3]).reverse + "\n"
-          i += 4
-        end while i < (Constants::FDSET_SIZE / 8)
-        string += "]\n"
-        string
       end
     end
 
