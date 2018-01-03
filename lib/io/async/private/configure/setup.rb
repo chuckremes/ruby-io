@@ -18,7 +18,6 @@ class IO
 
           def fiber_extension
             return if Fiber.current.respond_to?(:local)
-            STDERR.puts "extending Fiber.current"
             Fiber.current.extend(Internal::LocalMixin)
             raise "extension failed" unless Fiber.current.respond_to?(:local)
             Fiber.current.local[:sequence_no] = -1

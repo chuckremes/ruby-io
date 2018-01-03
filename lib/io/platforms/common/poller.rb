@@ -97,7 +97,6 @@ class IO
 
         master_set.each do |fd|
           break if 0 == count
-          puts "checking #{kind} fd [#{fd}]"
           if working_set.set?(fd: fd)
             master_set.clear(fd: fd)
             execute_callback(identity: fd, callbacks: callbacks, kind: kind)

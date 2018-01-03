@@ -36,7 +36,6 @@ class IO
 
         # man -s 2 pwrite for description of purpose, return codes, and errno
         def write(fd, buffer, nbytes, offset)
-          puts "fd [#{fd}], buffer [#{buffer.read_string}], nbytes [#{nbytes}], offset [#{offset}]"
           rc = Platforms.pwrite(fd, buffer, nbytes, offset)
           errno = rc < 0 ? ::FFI.errno : nil
           Logger.debug(klass: self.class, name: 'write_command', message: "rc [#{rc}], errno [#{errno}]")
