@@ -1,6 +1,8 @@
 $: << '../lib'
 require 'io'
 
+start = Time.now
+
 port = '3490'
 structs = IO::Async::TCP.getv4(hostname: 'localhost', service: port)
 
@@ -15,16 +17,20 @@ server_thr = Thread.new do
 
   server.accept do |address, socket, fd, errno|
     puts "ACCEPTED A SOCKET, rc [#{fd}], errno [#{errno}]"
-    buffer = ::FFI::MemoryPointer.new(:char, 500)
-    rc, errno = socket.recv(buffer: buffer, flags: 0)
-    puts "SERVER: recv: rc [#{rc}], errno [#{errno}], string [#{buffer.read_string}]"
-    p socket
-    puts "SERVER: sending response"
-    buffer.write_string('response back to client.')
-    rc, errno = socket.ssend(buffer: buffer, flags: 0)
-    puts "SERVER: recv: rc [#{rc}], errno [#{errno}]"
-    puts "Server: closing socket"
-    socket.close
+    if fd >= 0
+      buffer = ::FFI::MemoryPointer.new(:char, 500)
+      rc, errno = socket.recv(buffer: buffer, flags: 0)
+      puts "SERVER: recv: rc [#{rc}], errno [#{errno}], string [#{buffer.read_string}]"
+      p socket
+      puts "SERVER: sending response"
+      buffer.write_string('response back to client.')
+      rc, errno = socket.ssend(buffer: buffer, flags: 0)
+      puts "SERVER: recv: rc [#{rc}], errno [#{errno}]"
+      puts "Server: closing socket"
+      socket.close
+    else
+      puts "SERVER: shutting down early, accepted socket failed."
+    end
   end
 end
 
@@ -51,6 +57,7 @@ client_thr = Thread.new do
 end
 
 
-sleep 1 while runflag
+sleep 0.01 while runflag
 puts 'runflag is now false'
+puts "done after [#{Time.now - start}] seconds"
 puts 'exiting...'
