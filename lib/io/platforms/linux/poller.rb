@@ -47,7 +47,7 @@ class IO
         register(
           fd: fd,
           filter: Constants::EPOLLIN | Constants::EPOLLONESHOT,
-          operation: add_or_modify
+          operation: add_or_modify(fd: fd)
         )
         @readers << fd # on future calls, we will know to just modify existing registered FD
         Logger.debug(klass: self.class, name: 'epoll poller', message: "registered for read, fd [#{fd}]")
@@ -59,7 +59,7 @@ class IO
         register(
           fd: fd,
           filter: Constants::EPOLLOUT | Constants::EPOLLONESHOT,
-          operation: add_or_modify
+          operation: add_or_modify(fd: fd)
         )
         @writers << fd
         Logger.debug(klass: self.class, name: 'epoll poller', message: "registered for write, fd [#{fd}]")
