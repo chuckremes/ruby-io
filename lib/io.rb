@@ -1,10 +1,12 @@
 require 'fiber' # pull in Fiber.current and Fiber#transfer
 
 Thread.abort_on_exception = true
+DEBUG = false
 
 class IO
   class Logger
     def self.debug(klass:, name:, message:)
+      return unless DEBUG
       thr_id = Thread.current.object_id
       string = "[#{thr_id}], #{klass}##{name}, #{message}"
       STDERR.puts(string)
