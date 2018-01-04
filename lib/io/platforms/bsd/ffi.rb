@@ -122,72 +122,14 @@ class IO
       NOTE_NSECONDS = 0x00000004  # data is nanoseconds
     end
 
-    class KFilters
-      def initialize(value = 0)
-        @value = value
-      end
-
-      def to_i
-        @value
-      end
-
-      def read(state = true)
-        toggle(state, Platforms::Constants::EVFILT_READ)
-      end
-
-      def write(state = true)
-        toggle(state, Platforms::Constants::EVFILT_WRITE)
-      end
-
-      def timer(state = true)
-        toggle(state, Platforms::Constants::EVFILT_TIMER)
-      end
-
-      def except(state = true)
-        toggle(state, Platforms::Constants::EVFILT_EXCEPT)
-      end
-
-      def read?
-        on?(Platforms::Constants::EVFILT_READ)
-      end
-
-      def write?
-        on?(Platforms::Constants::EVFILT_WRITE)
-      end
-
-      def timer?
-        on?(Platforms::Constants::EVFILT_TIMER)
-      end
-
-      def except?
-        on?(Platforms::Constants::EVFILT_EXCEPT)
-      end
-
-      private
-
-      def toggle(on, constant)
-        on ? enable(constant) : disable(constant)
-      end
-
-      def enable(constant)
-        KFlags.new(to_i | constant)
-      end
-
-      def disable(constant)
-        KFlags.new(to_i & (~constant))
-      end
-
-      def on?(constant)
-        @value & constant
-      end
-    end
-
     class TimeSpecStruct < ::FFI::Struct
       layout \
         :tv_sec, :long,
         :tv_nsec, :long
     end
 
+    # FIXME: Most of the socket structs below are DUPLICATED!
+    
     def self.address_of(struct:, field:)
       ::FFI::Pointer.new(:uint8, struct.pointer.address + struct.offset_of(field))
     end
