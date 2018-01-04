@@ -19,10 +19,8 @@ This project exists to try out some ideas. I expect a few blind alleys before I 
 Tested and works on:
 * MRI 2.4.0, 2.5.0, 2.6.0dev
 * Rubinius 3.87 (minimum required version)
-* TruffleRuby (master)
-
-Fails on:
-* JRuby 9.1.15.0 (filed issue #4920; now fixed in master)
+* TruffleRuby (master as of 20171230)
+* JRuby (master as of 20180102)
 
 ## Platform Support
 Tested and working on:
@@ -51,7 +49,7 @@ Tested and working on:
 * Need a supportable way to generate FFI structs for all major target platforms; considering c2ffi project (on github) but the ruby-c2ffi needs a bunch of fixes.
 
 ## Longer Term Fixes
-* Ruby bug https://bugs.ruby-lang.org/issues/9664 prevents a fiber that has ever been transferred from yielding or resuming. This makes supporting Enumerators impossible. Generally speaking, it makes supporting any other Fiber-aware code very problematic because most code in the wild uses yield/resume instead of transfer.
+* Ruby bug https://bugs.ruby-lang.org/issues/9664 prevents a fiber that has ever been transferred from yielding or resuming. This makes supporting Enumerators impossible. Generally speaking, it makes supporting any other Fiber-aware code very problematic because most code in the wild uses yield/resume instead of transfer. If any of that code calls an Async IO method, the fiber will be transferred so any subsequent call to Fiber.yield or Fiber#resume will blow up.
 
 ## Philosophy
 The current Ruby IO classes are over 20 years old. As a result, they suffer from a few shortcomings. This project hopes to resolve several issues with the current classes.
