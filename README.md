@@ -30,12 +30,12 @@ Tested and working on:
 
 ## To Do Before First Public Release as Gem
 * Initial #each implementation
+* Initial IO::Transpose wrapper implementation
 * Start documentation with examples
+* Stub Error/Exception hierarchy
 * Hook up Error Policy for return codes and exceptions
 * Modify all methods to return a Result object instead of an array or hash
-* Initial IO::Transpose wrapper implementation
 * Sketch out remaining class inheritance and put in stubs (UDP, Pipe, RAW, FIFO/NamedPipe, IOCTL, TTY, StringIO, Stat, Utils)
-* Stub Error/Exception hierarchy
 
 ## To Do
 * Provide hooks for tracking IO statistics like bytes read/written; define API
