@@ -544,6 +544,10 @@ IO#ungetbyte has very strange semantics. Will not be supported.
 
 So for basic enumeration, we are left with #each(limit:, offset:), and each_byte(offset:).
 
+Note also that these mixins/classes are generic to Sync/Async. We use the same code for both; they are blocking-agnostic. However, we will probably have to pollute the method signature with a `timeout:` arg even though it would be ignored by the Sync IO objects.
+
+Create a LimitReader class that provides the #each functionality. It should be a strict, unbuffered reading of +limit+ bytes. For better perf (prove with a benchmark), offer a mixin that provides a BufferedLimitReader to replace the unbuffered one (really it will probably just subclass it). #each should be part of the IO class at all times. Note that File or String based IO needs an offset and will use #read under the covers; Socket, Pipe or other streams do NOT take an offset and usually use #recv to get data (pipe is a weird outlier). So, the #each method signature will be different for files versus sockets.
+
 
 FFI Select & FDSet
 FFI can't wrap macros. Luckily the select(2) macros are fairly simple and the fd_set struct is the same on all platforms. FD_SETSIZE is a max of 1024 and defaults to 64 on some platforms. We'll always allocate 1024.
@@ -598,6 +602,25 @@ Here's how it should work...
 * Async.sleep calls Internal::Backend::Async.build_timer_request which gets passed to the IOLoop.
 * IOLoop processes the timer request and passes it to the Poller. Some pollers like KqueuePoller know how to directly deal with timers and can create one. Use this facility if available. For SelectPoller, we'll need to maintain a sorted list of timers and utilize the select(2) timeout facility for triggering timer events. Note that select will return if any registered event is ready on a watched FD, so we might wake up before a timer is set to fire. In that case, we need to calculate the remaining sleep time and block again.
 * The timer request takes a closure just like other async requests (read, write, etc). When timer fires, execute the closure. In most cases this will be an empty / nil closure so its purpose will be to wake up the originating fiber.
+
+CLOSE
+When closing an Async FD, we need to make sure that closure flows through to the underlying Poller. The FD needs to be deregistered, any callbacks need to be deleted, their keys need to be deleted, etc. One way of achieving this is to have the `close` command wrapped in a new kind of Request. The Request could have a `unregister` method on it which would take a poller instance. When dispatched, this method gets called to remove the FD. Come to think of it, the NonblockingWriteCommand/NonblockingReadCommand/NonblockingTimerCommand classes all use `register` as the method name. This might be wrong. For a potential BlockingCloseCommand, we need a generic interface on the command to execute the removal of its FD from the poller. The method name `register` is too specific. Maybe `call`? Think on it.
+
+LIBRARY ERRORS
+We have a good handle on dealing with syscall errors. There's a return code (rc) and an error number (errno). rc is usually -1 and errno can be pretty much anything.
+
+So how do we distinguish from internal library errors. Simple! Just raise an exception with the explanation. Uh oh... doesn't work if the error policy is set for ReturnCode. Looks like we need to define our own. Sigh.
+
+I propose using -2 as the return code for library errors. The errno can be set to its OS equivalent. For example, if IO#each fails to run because someone passed a negative limit or negative offset, then errno should probably be same as EINVAL.
+
+It's really hard to get away from exceptions though in a language that allows so much method chaining. Someone who does `io.map { |val| transform(val) }.select { |v| v > 4 }` is not going to like it when #map returns an integer return code and errno. It *must* raise an exception otherwise there'll be a mutiny.
+
+So let's puzzle through this. If the above is accepted as fact ("mutiny"), then we can't avoid exceptions in all cases even when the programmer sets the policy to ReturnCode. Let's say that only direct IO calls (open, read, write, close, and its ilk) conform to the ReturnCode protocol. All other code (that only does a syscall *indirectly* by calling a method that conforms to ReturnCode) will interpret those codes and raise them as exceptions. Maybe I can make it super easy on myself by providing something like ReturnCode#to_exception so it transforms itself.
+
+def foo
+  return_code = somesyscall(...)
+  raise return_code.to_exception if return_code.error?
+end
 
 ## SyncIO::Config
 
