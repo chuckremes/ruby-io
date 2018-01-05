@@ -606,6 +606,8 @@ Here's how it should work...
 CLOSE
 When closing an Async FD, we need to make sure that closure flows through to the underlying Poller. The FD needs to be deregistered, any callbacks need to be deleted, their keys need to be deleted, etc. One way of achieving this is to have the `close` command wrapped in a new kind of Request. The Request could have a `unregister` method on it which would take a poller instance. When dispatched, this method gets called to remove the FD. Come to think of it, the NonblockingWriteCommand/NonblockingReadCommand/NonblockingTimerCommand classes all use `register` as the method name. This might be wrong. For a potential BlockingCloseCommand, we need a generic interface on the command to execute the removal of its FD from the poller. The method name `register` is too specific. Maybe `call`? Think on it.
 
+Additional thought... when reading from a socket or pipe, sometimes the remote end "hangs up" and we detect that by reading and getting 0 bytes back. On send, we might get rc -1 and an EPIPE errno (see send(2) and write(2)). These notices need to force the IO object into a state change. For example, if a socket peer disconnects from writing and we detect the 0, that object should move from ReadWrite state to WriteOnly. Since the user is always using the shell reference, its internal context can be updated to the new state without the user being aware. Next time they attempt to read, they'll get an error. We should make sure the error is correct so they can make the proper choice as for next steps.
+
 LIBRARY ERRORS
 We have a good handle on dealing with syscall errors. There's a return code (rc) and an error number (errno). rc is usually -1 and errno can be pretty much anything.
 
@@ -621,6 +623,37 @@ def foo
   return_code = somesyscall(...)
   raise return_code.to_exception if return_code.error?
 end
+
+SYSCALL ERRORS
+Oh, Ruby, your inconsistency is killing me. See this note from the IOError rdoc: "Note that some IO failures raise SystemCallErrors and these are not subclasses of IOError:"
+
+Yep, IO can raise Errno errors, IOErrors, and of course, EOFErrors. Time to pull all of these under one umbrella and make sense of them.
+
+class IO
+  module Error
+    module Errno < SystemCallError # just like current Ruby
+    end
+    
+    module Argument < ArgumentError # when bad values are passed and we get EINVAL
+    end
+    
+    module Operation # 
+    end
+  end
+end
+
+SPECS
+All specs should be written as shared specs. That is, any spec that passes in the Sync classes should also pass for the Async classes. This goal may not be possible to achieve; we'll see.
+
+UNICODE
+FYI, you can use Array#pack and String#unpack to build arbitrary UTF-8 strings. I ran this code to convert the numbers 0 to 255 into UTF-8 and then back into integers so I could see the encoding.
+
+array = 256.times.to_a.map {|v| v}
+utf8 = array.pack("U*")
+puts "size #{utf8.size}, bytesize #{utf8.bytesize}" => size 256, bytesize 384
+bytes = utf8.unpack("C*")
+
+Turns out that representing 0 to 255 (integer) in UTF-8 takes 384 bytes. From 0 to 127 UTF-8 can represent normal ASCII in a single byte. For 128 to 255, it takes a second byte to represent the codepoint.
 
 ## SyncIO::Config
 
