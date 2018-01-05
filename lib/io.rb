@@ -28,6 +28,8 @@ require_relative 'io/config/defaults'
 require_relative 'io/config/flags'
 require_relative 'io/config/mode'
 
+require_relative 'io/mixins/enumerable'
+
 # async
 require_relative 'io/internal/backend/async'
 require_relative 'io/async/private/private'
