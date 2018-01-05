@@ -52,7 +52,7 @@ class IO
       O_APPEND    = Fcntl::O_APPEND
       O_CREAT     = Fcntl::O_CREAT
       O_EXCL      = Fcntl::O_EXCL
-      O_NDELAY    = Fcntl::O_NDELAY
+      #O_NDELAY    = Fcntl::O_NDELAY
       O_NOCTTY    = Fcntl::O_NOCTTY
       O_NONBLOCK  = Fcntl::O_NONBLOCK
       O_RDONLY    = Fcntl::O_RDONLY
@@ -82,7 +82,7 @@ class IO
         O_APPEND    = Constants::O_APPEND
         O_CREAT     = Constants::O_CREAT
         O_EXCL      = Constants::O_EXCL
-        O_NDELAY    = Constants::O_NDELAY
+        #O_NDELAY    = Constants::O_NDELAY
         O_NOCTTY    = Constants::O_NOCTTY
         O_NONBLOCK  = Constants::O_NONBLOCK
         O_RDONLY    = Constants::O_RDONLY
