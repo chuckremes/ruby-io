@@ -46,6 +46,7 @@ class IO
 
           def ssend(buffer:, flags:, timeout: nil)
             results = @backend.ssend(fd: @fd, buffer: buffer, flags: flags, timeout: timeout)
+            [result[:rc], results[:errno]]
           end
 
           def sendto(addr:, buffer:, flags:, timeout: nil)
@@ -58,6 +59,7 @@ class IO
 
           def recv(buffer:, flags:, timeout: nil)
             results = @backend.recv(fd: @fd, buffer: buffer, flags: flags, timeout: timeout)
+            [result[:rc], results[:errno], buffer.read_string]
           end
 
           def recvfrom(addr:, buffer:, flags:, timeout: nil)

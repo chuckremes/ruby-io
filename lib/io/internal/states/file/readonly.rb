@@ -32,8 +32,8 @@ class IO
 
           def read(nbytes:, offset:, buffer: nil, timeout: nil)
             buffer ||= ::FFI::MemoryPointer.new(nbytes)
-            rc, errno = @backend.read(fd: @fd, buffer: buffer, nbytes: nbytes, offset: offset, timeout: timeout)
-            [rc, errno, buffer.read_string]
+            reply = @backend.read(fd: @fd, buffer: buffer, nbytes: nbytes, offset: offset, timeout: timeout)
+            [reply[:rc], reply[:errno], buffer.read_string]
           end
 
           def write(offset:, string:, timeout: nil)
