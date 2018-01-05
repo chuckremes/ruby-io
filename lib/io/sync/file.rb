@@ -6,6 +6,8 @@ require 'io/internal/states/file/writeonly'
 class IO
   module Sync
     class File
+      include Mixins::BufferedEnumerable
+
       class << self
         def open(path:, flags: nil, error_policy: nil)
           mode = Config::Mode.from_flags(flags)
@@ -48,25 +50,25 @@ class IO
         end
       end
 
-      def close
+      def close(timeout: nil)
         rc, errno = safe_delegation do |context|
-          rc, errno, behavior = context.close(timeout: nil)
+          rc, errno, behavior = context.close(timeout: timeout)
           [rc, errno]
         end
         [rc, errno]
       end
 
-      def read(nbytes:, offset:, buffer: nil)
+      def read(nbytes:, offset:, buffer: nil, timeout: nil)
         rc, errno, buffer = safe_delegation do |context|
-          rc, errno = context.read(nbytes: nbytes, offset: offset, buffer: buffer, timeout: nil)
+          rc, errno = context.read(nbytes: nbytes, offset: offset, buffer: buffer, timeout: timeout)
           [rc, errno, buffer]
         end
         [rc, errno, buffer]
       end
 
-      def write(offset:, string:)
+      def write(offset:, string:, timeout: nil)
         rc, errno = safe_delegation do |context|
-          rc, errno = context.write(offset: offset, string: string, timeout: nil)
+          rc, errno = context.write(offset: offset, string: string, timeout: timeout)
           [rc, errno]
         end
         [rc, errno]
