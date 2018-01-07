@@ -29,6 +29,7 @@ class IO
         # man -s 2 pread for description of purpose, return codes, and errno
         def read(fd, buffer, nbytes, offset)
           rc = Platforms.pread(fd, buffer, nbytes, offset)
+          #rc = Platforms.read(fd, buffer, nbytes)
           errno = rc < 0 ? ::FFI.errno : nil
           Logger.debug(klass: self.class, name: 'read_command', message: "rc [#{rc}], errno [#{errno}]")
           {rc: rc, errno: errno}

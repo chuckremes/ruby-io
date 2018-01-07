@@ -8,6 +8,7 @@ class IO
     # attach to functions common to all POSIX-compliant platforms
     attach_function :open, [:pointer, :int, :int], :int, :blocking => true
     attach_function :close, [:int], :int, :blocking => true
+    attach_function :read, [:int, :pointer, :size_t], :ssize_t, :blocking => true
     attach_function :pread, [:int, :pointer, :size_t, :off_t], :ssize_t, :blocking => true
     attach_function :pwrite, [:int, :pointer, :size_t, :off_t], :ssize_t, :blocking => true
     attach_function :write,       [:int, :pointer, :size_t], :ssize_t
