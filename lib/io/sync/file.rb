@@ -59,11 +59,11 @@ class IO
       end
 
       def read(nbytes:, offset:, buffer: nil, timeout: nil)
-        rc, errno, buffer = safe_delegation do |context|
+        rc, errno, string = safe_delegation do |context|
           rc, errno = context.read(nbytes: nbytes, offset: offset, buffer: buffer, timeout: timeout)
-          [rc, errno, buffer]
+          [rc, errno, string]
         end
-        [rc, errno, buffer]
+        [rc, errno, string]
       end
 
       def write(offset:, string:, timeout: nil)
