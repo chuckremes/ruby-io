@@ -304,7 +304,7 @@ IO
 |
 |---------------------------------------------------------------------------------
 |                     |               |              |            |              |
-Internal            Async            Sync         Config      Constants      Transposer
+Internal            Async            Sync         Config      Constants      Transcoder
    |
    |
    |-- Private
@@ -318,8 +318,10 @@ The IO::Internal::Platforms::Functions namespace will contain small Ruby methods
 IOCTL
 Need to investigate this a bit more. The ioctl for sockets shows quite a few macros for handling addresses and such. If ioctl is the only exposure for these things then I'll likely need to support this even though all of ioctl is supported via C Macros. Will need C function wrappers for the macros. Hopefully all functionality is exposed via other utilities like get/setsockopt, getsockname, etc. Same for fileio.h and tty.h. Sigh. Good article: https://stackoverflow.com/questions/15807846/ioctl-linux-device-driver
 
-Tranposer
-The core IO classes deal with 8-bit bytes exclusively. They have no notion of "character" or multi-byte character. To get this behavior, there is a `Transposer` class which can either wrap an existing IO (composition) or the IO can extend the TranposerMixin. This class provides the Encoding support to read/write characters in all their myriad forms. It will provide an `each_char` method. If used as a Mixin, then it overrides the built-in `each` method to work on char boundaries. The old `each` method is renamed `each_byte` and remains available for use. A convenience mixin provides `each_line`
+Transcoder
+The core IO classes deal with 8-bit bytes exclusively. They have no notion of "character" or multi-byte character. To get this behavior, there is a `Transcoder` class which can either wrap an existing IO (composition) or the IO can extend the TranposerMixin. This class provides the Encoding support to read/write characters in all their myriad forms. It will provide an `each_char` method. If used as a Mixin, then it overrides the built-in `each` method to work on char boundaries. The old `each` method is renamed `each_byte` and remains available for use. A convenience mixin provides `each_line`
+
+Had a wild idea while walking the dogs tonight. Instead of requiring everyone to wrap their IO object in a Transcoder, let the factory methods creating IO objects take an encoding option. If it's anything other than ASCII_8BIT, use a trick learned from Celluloid that let's the #new return a different object. The object would be the transcoder (same API as a regular IO object) and it would be completely transparent. I froget the technique but it had something to do with overriding #allocate I think.
 
 ONLY LOAD WHAT WE NEED
 Restructure so that we can load only what we want/need. e.g.
@@ -486,7 +488,7 @@ Makes no sense to create a single-ended pipe. When using `pipe` syscall, it crea
 DIRECTORIES
 Many of the current methods on Ruby's Dir seem pointless. Methods like #tell, #read, etc are strange. Might just be my ignorance of the utility of these functions, so research it a bit. 
 For new Dir class, thinking that it won't returns Strings as pathnames. We should also return a URL (universal record locator) object. This will, of course, have a #to_s method on it so someone can get a string if they really want it. Dir#each should take keyword args so the programmer can control some behavior.
-For encoding, provide a IO::TransposeDir or similar. Need to figure out that hierarchy.
+For encoding, provide a IO::TranscodeDir or similar. Need to figure out that hierarchy.
 Dir.glob is going to be fun to implement in Ruby. Hear there are lots of performance issues so we'll need to be smart and maybe a bit clever.
 
 EACH
@@ -496,7 +498,7 @@ Also, the #each methods should handle buffering. The "limit" readers can pretty 
 
 Note that TruffleRuby just improved #gets and #each by making sure to only instantiate a single EachReader instead of instantiating a new one to every call to #each. Maybe have a private method __each__ that handles this instatiation and we just call into it from the public facing methods. Again, this will be easier to figure out during implementation.
 
-The Transpose class(es) will provide their own #each methods that work on characters. When reading unicode, we know that 16-byte chars and 32-byte chars always take the same amount of space. Converting from bytes to chars is a simple multiplication. UTF-8 is trickier since a char can be anywhere from 1 to 4 bytes long. To read 80 chars requires reading AT LEAST 80 bytes and perhaps as many as 320 bytes.
+The Transcode class(es) will provide their own #each methods that work on characters. When reading unicode, we know that 16-byte chars and 32-byte chars always take the same amount of space. Converting from bytes to chars is a simple multiplication. UTF-8 is trickier since a char can be anywhere from 1 to 4 bytes long. To read 80 chars requires reading AT LEAST 80 bytes and perhaps as many as 320 bytes.
 
 The methods in original Ruby IO that support enumeration of the IO stream are:
 IO.foreach
@@ -521,7 +523,7 @@ Several of these are duplicates of each other and differ only in how EOF is hand
 First, let's separate out the byte-level enumeration from character/string enumeration. These byte-level operations should properly be part of the main enumeration mixin.
 IO#each, IO#each_byte, IO#getbyte, IO#readbyte, IO#ungetbyte
 
-The Transpose enumeration mixin should support the remaining ideas but with a simplified keyword-aware interface.
+The Transcode enumeration mixin should support the remaining ideas but with a simplified keyword-aware interface.
 IO.readlines, IO#each_char, IO#each_codepoint, IO#each_line, IO#getc, IO#gets, IO#readchar, IO#readline, IO#readlines, IO#ungetc
 
 The basis of all is IO#each. In current Ruby, IO#each works on lines/strings. For a system that works with ASCII_8BIT this kind of doesn't make sense. Let's suggest that #each only works on bytes and will read those bytes with some +limit+. The other methods can compose their operations on top of the work that #each performs.
