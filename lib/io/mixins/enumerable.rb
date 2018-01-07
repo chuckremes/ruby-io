@@ -33,7 +33,6 @@ class IO
         def read_to_limit(&block)
           wanted = limit = @limit
           offset = @offset
-          buffer = ::FFI::MemoryPointer.new(wanted)
 
           begin
             rc, errno, buffer = read_from_storage(
