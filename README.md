@@ -39,7 +39,6 @@ Tested and working on:
 
 ## To Do
 * Provide hooks for tracking IO statistics like bytes read/written; define API
-* Implement self-pipe trick so fiber loops can wake IOLoop when posting to its mailbox
 * Change Platforms module to POSIX?
   ** Should consider also supporting some functions that are platform-specific in its own namespace. Thinking of #writev and copy_file_range(2) which are not part of POSIX.
 * Modify async `close` so that registered FDs are deregistered explicitly from Poller, callbacks removed, etc.
