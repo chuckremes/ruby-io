@@ -11,8 +11,9 @@ class IO
     class SelectPoller
       NO_TIMEOUT = TimeValStruct.new
       SHORT_TIMEOUT = TimeValStruct.new.tap { |ts| ts[:tv_usec] = 1 }
+      SELF_PIPE_READ_SIZE = 20
 
-      def initialize
+      def initialize(self_pipe:)
         @read_master_set   = FDSetStruct.new
         @read_working_set  = FDSetStruct.new
         @write_master_set  = FDSetStruct.new
@@ -22,6 +23,8 @@ class IO
         @write_callbacks = {}
         @timeval = TimeValStruct.new
         @timers = Common::Timers.new
+        
+        self_pipe_setup(self_pipe)
         Logger.debug(klass: self.class, name: 'select poller', message: 'poller allocated!')
       end
 
@@ -101,9 +104,10 @@ class IO
 
       def execute_callback(identity:, callbacks:, kind:)
         Logger.debug(klass: self.class, name: 'select poller', message: "execute [#{kind}] callback for fd [#{identity}]")
-        block = callbacks.delete(identity)
-        if block
-          block.call
+
+        request = callbacks.delete(identity)
+        if request
+          request == :self_pipe ? self_pipe_read : request.call
         else
           raise "Got [#{kind}] event for fd [#{identity}] with no registered callback"
         end
@@ -127,6 +131,23 @@ class IO
         @timeval[:tv_sec] = seconds
         @timeval[:tv_usec] = microseconds
         @timeval
+      end
+
+      def self_pipe_read
+        Logger.debug(klass: self.class, name: 'kqueue poller', message: 'self-pipe awakened sleeping selector')
+        # ignore read errors
+        begin
+          reply = Platforms::Functions.read(@self_pipe, @self_pipe_buffer, SELF_PIPE_READ_SIZE)
+          rc = reply[:rc]
+        end until rc.zero? || rc == -1
+        # necessary to reregister since everything is setup for ONESHOT
+        register_read(fd: @self_pipe, request: :self_pipe)
+      end
+
+      def self_pipe_setup(self_pipe)
+        @self_pipe = self_pipe
+        @self_pipe_buffer = ::FFI::MemoryPointer.new(:int, SELF_PIPE_READ_SIZE)
+        register_read(fd: @self_pipe, request: :self_pipe)
       end
     end
 

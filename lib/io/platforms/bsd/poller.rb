@@ -11,8 +11,9 @@ class IO
       MAX_EVENTS = 10
       NO_TIMEOUT = TimeSpecStruct.new
       SHORT_TIMEOUT = TimeSpecStruct.new.tap { |ts| ts[:tv_sec] = 1 }
+      SELF_PIPE_READ_SIZE = 20
 
-      def initialize
+      def initialize(self_pipe:)
         @kq_fd = Platforms.kqueue
 
         # fatal error if we can't allocate the kqueue
@@ -27,6 +28,9 @@ class IO
         @write_callbacks = {}
         @timers = Common::Timers.new
         @timespec = TimeSpecStruct.new
+
+        self_pipe_setup(self_pipe)
+        Logger.debug(klass: self.class, name: 'kqueue poller', message: "registered self-pipe for read [#{@self_pipe}]")
         Logger.debug(klass: self.class, name: 'kqueue poller', message: 'kqueue allocated!')
       end
 
@@ -109,15 +113,14 @@ class IO
 
       def process_timer_event(event:)
         @timers.fire_expired
-        #execute_callback(event: event, identity: event.udata, callbacks: @timer_callbacks, kind: 'TIMER')
       end
 
       def execute_callback(event:, identity:, callbacks:, kind:)
         Logger.debug(klass: self.class, name: 'kqueue poller', message: "execute [#{kind}] callback for fd [#{identity}]")
 
-        block = callbacks.delete(identity)
-        if block
-          block.call
+        request = callbacks.delete(identity)
+        if request
+          request == :self_pipe ? self_pipe_read : request.call
         else
           raise "Got [#{kind}] event for fd [#{identity}] with no registered callback"
         end
@@ -149,6 +152,23 @@ class IO
         @timespec[:tv_sec] = seconds
         @timespec[:tv_nsec] = nanoseconds
         @timespec
+      end
+
+      def self_pipe_read
+        Logger.debug(klass: self.class, name: 'kqueue poller', message: 'self-pipe awakened sleeping selector')
+        # ignore read errors
+        begin
+          reply = Platforms::Functions.read(@self_pipe, @self_pipe_buffer, SELF_PIPE_READ_SIZE)
+          rc = reply[:rc]
+        end until rc.zero? || rc == -1
+        # necessary to reregister since everything is setup for ONESHOT
+        register_read(fd: @self_pipe, request: :self_pipe)
+      end
+
+      def self_pipe_setup(self_pipe)
+        @self_pipe = self_pipe
+        @self_pipe_buffer = ::FFI::MemoryPointer.new(:int, SELF_PIPE_READ_SIZE)
+        register_read(fd: @self_pipe, request: :self_pipe)
       end
     end
 

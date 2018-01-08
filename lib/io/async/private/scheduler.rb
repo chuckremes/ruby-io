@@ -6,7 +6,7 @@ class IO
           # TODO: Need to consider making one or both of these SizedQueues so we
           # can exert back-pressure on threads that are producing too many
           # IO Requests.
-          @outbox = Mailbox.new # conduit to IOLoop
+          @outbox = nil # conduit to IOLoop, allocated after fetching IOLoop
           @inbox = Mailbox.new # replies back from IOLoop
 
           @mapper = Mapper.new
@@ -38,6 +38,7 @@ class IO
           # It's a singleton object, so just ask it for a reference
           # to the current IO Loop
           @io_loop = IOLoop.current
+          @outbox = IOLoopMailbox.new(self_pipe: @io_loop.self_pipe_writer)
           @io_loop.register(fiber: Fiber.current, outbox: @outbox)
         end
 

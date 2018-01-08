@@ -12,8 +12,9 @@ class IO
     class EPollPoller
       MAX_EVENTS = 10
       SHORT_TIMEOUT = 1_000 # milliseconds
+      SELF_PIPE_READ_SIZE = 20
 
-      def initialize
+      def initialize(self_pipe:)
         @epoll_fd = Platforms.epoll_create1(0)
 
         # fatal error if we can't allocate the kqueue
@@ -30,6 +31,8 @@ class IO
         @readers = Set.new
         @writers = Set.new
         @timers = Common::Timers.new
+        
+        self_pipe_setup(self_pipe)
         Logger.debug(klass: self.class, name: 'epoll poller', message: 'epoll allocated!')
       end
 
@@ -109,9 +112,9 @@ class IO
       def execute_callback(event:, identity:, callbacks:, kind:)
         Logger.debug(klass: self.class, name: 'kqueue poller', message: "execute [#{kind}] callback for fd [#{identity}]")
 
-        block = callbacks.delete(identity)
-        if block
-          block.call
+        request = callbacks.delete(identity)
+        if request
+          request == :self_pipe ? self_pipe_read : request.call
         else
           raise "Got [#{kind}] event for fd [#{identity}] with no registered callback"
         end
@@ -143,6 +146,23 @@ class IO
         delay_ms = @timers.wait_interval.to_i
         delay_ms = 50 if delay_ms.zero?
         delay_ms
+      end
+
+      def self_pipe_read
+        Logger.debug(klass: self.class, name: 'kqueue poller', message: 'self-pipe awakened sleeping selector')
+        # ignore read errors
+        begin
+          reply = Platforms::Functions.read(@self_pipe, @self_pipe_buffer, SELF_PIPE_READ_SIZE)
+          rc = reply[:rc]
+        end until rc.zero? || rc == -1
+        # necessary to reregister since everything is setup for ONESHOT
+        register_read(fd: @self_pipe, request: :self_pipe)
+      end
+
+      def self_pipe_setup(self_pipe)
+        @self_pipe = self_pipe
+        @self_pipe_buffer = ::FFI::MemoryPointer.new(:int, SELF_PIPE_READ_SIZE)
+        register_read(fd: @self_pipe, request: :self_pipe)
       end
     end
 

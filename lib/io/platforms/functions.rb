@@ -18,6 +18,14 @@ class IO
           {rc: rc, errno: errno}
         end
 
+        # man -s 2 pipe for description of purpose, return codes, and errno
+        def pipe(fd_array)
+          rc = Platforms.pipe(fd_array)
+          errno = rc < 0 ? ::FFI.errno : nil
+          Logger.debug(klass: self.class, name: 'open_command', message: "rc [#{rc}], errno [#{errno}]")
+          {rc: rc, errno: errno, array: fd_array}
+        end
+
         # man -s 2 close for description of purpose, return codes, and errno
         def close(fd)
           rc = Platforms.close(fd)
@@ -27,16 +35,31 @@ class IO
         end
 
         # man -s 2 pread for description of purpose, return codes, and errno
-        def read(fd, buffer, nbytes, offset)
+        def pread(fd, buffer, nbytes, offset)
           rc = Platforms.pread(fd, buffer, nbytes, offset)
-          #rc = Platforms.read(fd, buffer, nbytes)
           errno = rc < 0 ? ::FFI.errno : nil
           Logger.debug(klass: self.class, name: 'read_command', message: "rc [#{rc}], errno [#{errno}]")
           {rc: rc, errno: errno}
         end
 
+        # man -s 2 read for description of purpose, return codes, and errno
+        def read(fd, buffer, nbytes)
+          rc = Platforms.read(fd, buffer, nbytes)
+          errno = rc < 0 ? ::FFI.errno : nil
+          Logger.debug(klass: self.class, name: 'read_command', message: "rc [#{rc}], errno [#{errno}]")
+          {rc: rc, errno: errno}
+        end
+
+        # man -s 2 write for description of purpose, return codes, and errno
+        def write(fd, buffer, nbytes)
+          rc = Platforms.write(fd, buffer, nbytes)
+          errno = rc < 0 ? ::FFI.errno : nil
+          Logger.debug(klass: self.class, name: 'write_command', message: "rc [#{rc}], errno [#{errno}]")
+          {rc: rc, errno: errno}
+        end
+
         # man -s 2 pwrite for description of purpose, return codes, and errno
-        def write(fd, buffer, nbytes, offset)
+        def pwrite(fd, buffer, nbytes, offset)
           rc = Platforms.pwrite(fd, buffer, nbytes, offset)
           errno = rc < 0 ? ::FFI.errno : nil
           Logger.debug(klass: self.class, name: 'write_command', message: "rc [#{rc}], errno [#{errno}]")

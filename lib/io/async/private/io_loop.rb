@@ -7,17 +7,18 @@ class IO
         class << self
           def current
             unless @loop
-              Logger.debug(klass: self.class, name: :current, message: 'allocate IOLoop')              
+              Logger.debug(klass: self.class, name: :current, message: 'allocate IOLoop')
               @loop = IOLoop.new
             end
             @loop
           end
         end
-        
+
         def initialize
           Logger.debug(klass: self.class, name: :new, message: 'allocating')
-          @poller = Internal::Backend::Async::Poller.new
-          @system_inbox = Mailbox.new
+          @pipe_reader, @pipe_writer = self_pipe_trick_setup
+          @poller = Internal::Backend::Async::Poller.new(self_pipe: @pipe_reader)
+          @system_inbox = IOLoopMailbox.new(self_pipe: @pipe_writer)
 
           # Store the mailboxes from all registered Fiber Schedulers. Command
           # Requests come in via this mailbox. Note that replies are sent back
@@ -41,8 +42,8 @@ class IO
         def io_loop
           Logger.debug(klass: self.class, name: :io_loop, message: 'entering infinite loop')
           loop do
- #           Logger.debug(klass: self.class, name: :io_loop, message: 'looping')
-            
+            #           Logger.debug(klass: self.class, name: :io_loop, message: 'looping')
+
             process_system_messages
             process_command_messages
           end
@@ -52,7 +53,7 @@ class IO
         # IOLoop are handled here.
         def process_system_messages
           request = @system_inbox.pickup
-#          Logger.debug(klass: self.class, name: :process_system_messages, message: (request ? request.inspect : 'no request'))
+          #          Logger.debug(klass: self.class, name: :process_system_messages, message: (request ? request.inspect : 'no request'))
           return unless request
 
           Logger.debug(klass: self.class, name: :process_system_messages, message: 'got a valid request, working...')
@@ -81,7 +82,7 @@ class IO
         # and are handled in this loop directly.
         def process_command_messages
           immediate_count = 0
-          
+
           @incoming.values.each do |mailbox|
             request = mailbox.pickup
             #Logger.debug(klass: self.class, name: :process_command_messages, message: (request ? request.inspect : 'no request'))
@@ -113,6 +114,37 @@ class IO
 
         def flush_immediate
           @poller.poll
+        end
+
+        # Utilize the well-known technique for waking a sleeping/blocked selector
+        # by writing to a pipe that is part of the selector's read set.
+        #
+        # This method allocates the file descriptors and sets them to non-blocking.
+        # We also don't want these FDs to transfer to a fork, so set close-on-exec.
+        #
+        def self_pipe_trick_setup
+          pipe_fds = ::FFI::MemoryPointer.new(:int, 2)
+          reply = Platforms::Functions.pipe(pipe_fds)
+          rc = reply[:rc]
+
+          # fatal error if this allocation fails
+          raise "Fatal error, self-pipe failed to allocate, rc [#{rc}] errno [#{FFI.errno}]" if rc < 0
+          reader, writer = pipe_fds.read_array_of_int(2)
+          rc, errno = Sync::FCNTL.set_nonblocking(fd: reader)
+          raise "Fatal error, could not set reader to nonblocking, rc [#{rc}] errno [#{errno}]" if rc < 0
+          rc, errno = Sync::FCNTL.set_nonblocking(fd: writer)
+          raise "Fatal error, could not set writer to nonblocking, rc [#{rc}] errno [#{errno}]" if rc < 0
+          rc, errno = Sync::FCNTL.set_close_on_exec(fd: reader)
+          raise "Fatal error, could not set reader to close-on-exec, rc [#{rc}] errno [#{errno}]" if rc < 0
+          rc, errno = Sync::FCNTL.set_close_on_exec(fd: writer)
+          raise "Fatal error, could not set writer to close-on-exec, rc [#{rc}] errno [#{errno}]" if rc < 0
+          Logger.debug(klass: self.class, name: 'IOLoop', message: "self-pipe, reader [#{reader}], writer [#{writer}]")
+
+          [reader, writer]
+        end
+
+        def self_pipe_writer
+          @pipe_writer
         end
 
         IOLoop.current # make sure we allocate it during load step
