@@ -175,6 +175,8 @@ class IO
           end
 
           def build_command(fiber)
+            # Expects the Platforms::Functions call to return a reply as a hash! See
+            # code at Platforms::Functions.reply
             results = yield
             results[:fiber] = fiber
             results
