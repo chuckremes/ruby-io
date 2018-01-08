@@ -30,6 +30,12 @@ require_relative 'io/config/mode'
 
 require_relative 'io/mixins/enumerable'
 
+# sync
+require_relative 'io/internal/backend/sync'
+require_relative 'io/sync/fcntl'
+require_relative 'io/sync/file'
+require_relative 'io/sync/tcp'
+
 # async
 require_relative 'io/internal/backend/async'
 require_relative 'io/async/private/private'
@@ -37,9 +43,3 @@ require_relative 'io/async/timer'
 require_relative 'io/async/fcntl'
 require_relative 'io/async/file'
 require_relative 'io/async/tcp'
-
-# sync
-require_relative 'io/internal/backend/sync'
-require_relative 'io/sync/fcntl'
-require_relative 'io/sync/file'
-require_relative 'io/sync/tcp'
