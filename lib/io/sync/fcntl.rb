@@ -6,67 +6,56 @@ class IO
       end
 
       class << self
-        def fcntl(fd:, cmd:, args: nil)
-          Internal::Backend::Sync.fcntl(fd: fd, cmd: cmd, args: args)
+        def fcntl(fd:, cmd:, args: nil, timeout: nil)
+          reply = Internal::Backend::Sync.fcntl(fd: fd, cmd: cmd, args: args, timeout: nil)
+          [reply[:rc], reply[:errno]]
         end
 
-        def get_fd_flag(fd:)
-          fcntl(fd: fd, cmd: Constants::F_GETFD)
+        def get_fd_flag(fd:, timeout: nil)
+          fcntl(fd: fd, cmd: Constants::F_GETFD, timeout: timeout)
         end
 
-        def set_fd_flag(fd:, flag:)
-          current_flags = get_status_flags(fd: fd)
+        def set_fd_flag(fd:, flag:, timeout: nil)
+          rc, errno = get_status_flags(fd: fd, timeout: timeout)
           
-          if reply[:rc] < 0
-            return [reply[:rc], reply[:errno]]
-          elsif (reply[:rc] & flag) == 0
-            return [0, nil]
-          end
+          return [rc, errno] if rc < 0
 
-          current_flags = reply[:rc] | flag
-          fcntl(fd: fd, cmd: Constants::F_SETFD, args: current_flags.to_i)
+          current_flags = rc | flag
+          fcntl(fd: fd, cmd: Constants::F_SETFD, args: current_flags.to_i, timeout: timeout)
         end
 
-        def get_status_flags(fd:)
-          fcntl(fd: fd, cmd: Constants::F_GETFL)
+        def get_status_flags(fd:, timeout: nil)
+          fcntl(fd: fd, cmd: Constants::F_GETFL, timeout: timeout)
         end
 
-        def set_status_flag(fd:, flag:)
-          current_flags = get_status_flags(fd: fd)
+        def set_status_flag(fd:, flag:, timeout: nil)
+          rc, errno = get_status_flags(fd: fd, timeout: timeout)
           
-          if reply[:rc] < 0
-            return [reply[:rc], reply[:errno]]
-          elsif (reply[:rc] & flag) == 0
-            return [0, nil]
-          end
+          return [rc, errno] if rc < 0
 
-          current_flags = reply[:rc] | flag
-          fcntl(fd: fd, cmd: Constants::F_SETFL, args: current_flags.to_i)
+          current_flags = rc | flag
+          fcntl(fd: fd, cmd: Constants::F_SETFL, args: current_flags.to_i, timeout: timeout)
         end
 
-        def clear_status_flag(fd:, flag:)
-          current_flags = get_status_flags(fd: fd)
+        def clear_status_flag(fd:, flag:, timeout: nil)
+          rc, errno = get_status_flags(fd: fd, timeout: timeout)
           
-          if reply[:rc] < 0
-            return [reply[:rc], reply[:errno]]
-          elsif (reply[:rc] & flag) == 0
-            return [0, nil]
-          end
+          return [rc, errno] if rc < 0
 
-          current_flags = reply[:rc] & ~flag
-          fcntl(fd: fd, cmd: Constants::F_SETFL, args: current_flags.to_i)
+          current_flags = rc & ~flag
+          fcntl(fd: fd, cmd: Constants::F_SETFL, args: current_flags.to_i, timeout: timeout)
         end
 
-        def set_nonblocking(fd:)
-          set_status_flag(fd: fd, flag: Constants::O_NONBLOCK)
+        def set_nonblocking(fd:, timeout: nil)
+          set_status_flag(fd: fd, flag: Constants::O_NONBLOCK, timeout: timeout)
         end
 
-        def set_close_on_exec(fd:)
-          set_fd_flag(fd: fd, flag: Constants::FD_CLOEXEC)
+        def set_close_on_exec(fd:, timeout: nil)
+          set_fd_flag(fd: fd, flag: Constants::FD_CLOEXEC, timeout: timeout)
         end
 
-        def duplicate_fd(fd:, fd_minimum:)
-          fcntl(fd: fd, cmd: Constants::F_DUPFD, args: fd_minimum)
+        def duplicate_fd(fd:, fd_minimum:, timeout: nil)
+          fcntl(fd: fd, cmd: Constants::F_DUPFD, args: fd_minimum, timeout: timeout)
         end
       end
 
@@ -74,36 +63,36 @@ class IO
         @fd = fd
       end
 
-      def get_flag
-        FCNTL.get_flag(fd: @fd)
+      def get_flag(timeout: nil)
+        FCNTL.get_flag(fd: @fd, timeout: timeout)
       end
 
-      def set_nonblocking
-        FCNTL.set_nonblocking(fd: @fd)
+      def set_nonblocking(timeout: nil)
+        FCNTL.set_nonblocking(fd: @fd, timeout: timeout)
       end
 
-      def set_close_on_exec
-        FCNTL.set_close_on_exec(fd: @fd)
+      def set_close_on_exec(timeout: nil)
+        FCNTL.set_close_on_exec(fd: @fd, timeout: timeout)
       end
 
-      def duplicate_fd
-        FCNTL.duplicate_fd(fd: @fd)
+      def duplicate_fd(timeout: nil)
+        FCNTL.duplicate_fd(fd: @fd, timeout: timeout)
       end
 
-      def get_fd_flag
-        FCNTL.get_fd_flag(fd: @fd)
+      def get_fd_flag(timeout: nil)
+        FCNTL.get_fd_flag(fd: @fd, timeout: timeout)
       end
 
-      def set_fd_flag(flag:)
-        FCNTL.set_fd_flag(fd: @fd, flag: flag)
+      def set_fd_flag(flag:, timeout: nil)
+        FCNTL.set_fd_flag(fd: @fd, flag: flag, timeout: timeout)
       end
 
-      def get_status_flag
-        FCNTL.get_status_flag(fd: @fd)
+      def get_status_flag(timeout: nil)
+        FCNTL.get_status_flag(fd: @fd, timeout: timeout)
       end
 
-      def set_status_flag(flag:)
-        FCNTL.set_status_flag(fd: @fd, flag: flag)
+      def set_status_flag(flag:, timeout: nil)
+        FCNTL.set_status_flag(fd: @fd, flag: flag, timeout: timeout)
       end
     end
   end
