@@ -24,15 +24,29 @@ class IO
             reply
           end
 
-          def read(fd:, buffer:, nbytes:, offset:, timeout:)
-            reply = Platforms::Functions.read(fd, buffer, nbytes, offset)
+          def read(fd:, buffer:, nbytes:, timeout:)
+            reply = Platforms::Functions.read(fd, buffer, nbytes)
 
             #Policy.check(reply)
             reply
           end
 
-          def write(fd:, buffer:, nbytes:, offset:, timeout:)
-            reply = Platforms::Functions.write(fd, buffer, nbytes, offset)
+          def write(fd:, buffer:, nbytes:, timeout:)
+            reply = Platforms::Functions.write(fd, buffer, nbytes)
+
+            #Policy.check(reply)
+            reply
+          end
+
+          def pread(fd:, buffer:, nbytes:, offset:, timeout:)
+            reply = Platforms::Functions.pread(fd, buffer, nbytes, offset)
+
+            #Policy.check(reply)
+            reply
+          end
+
+          def wwrite(fd:, buffer:, nbytes:, offset:, timeout:)
+            reply = Platforms::Functions.pwrite(fd, buffer, nbytes, offset)
 
             #Policy.check(reply)
             reply

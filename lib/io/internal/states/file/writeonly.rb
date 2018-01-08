@@ -38,7 +38,7 @@ class IO
             nbytes = string.bytesize
             buffer = ::FFI::MemoryPointer.new(nbytes)
             buffer.write_string(string)
-            reply = @backend.write(fd: @fd, buffer: buffer, nbytes: nbytes, offset: offset, timeout: timeout)
+            reply = @backend.pwrite(fd: @fd, buffer: buffer, nbytes: nbytes, offset: offset, timeout: timeout)
             [reply[:rc], reply[:errno]]
           end
         end

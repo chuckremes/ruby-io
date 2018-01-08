@@ -38,10 +38,10 @@ class IO
             reply
           end
 
-          def read(fd:, buffer:, nbytes:, offset:, timeout:)
+          def read(fd:, buffer:, nbytes:, timeout:)
             reply = build_blocking_request do |fiber|
               build_command(fiber) do
-                Platforms::Functions.read(fd, buffer, nbytes, offset)
+                Platforms::Functions.read(fd, buffer, nbytes)
               end
             end
 
@@ -49,10 +49,32 @@ class IO
             reply
           end
 
-          def write(fd:, buffer:, nbytes:, offset:, timeout:)
+          def write(fd:, buffer:, nbytes:, timeout:)
             reply = build_blocking_request do |fiber|
               build_command(fiber) do
-                Platforms::Functions.write(fd, buffer, nbytes, offset)
+                Platforms::Functions.write(fd, buffer, nbytes)
+              end
+            end
+
+            #Policy.check(reply)
+            reply
+          end
+
+          def pread(fd:, buffer:, nbytes:, offset:, timeout:)
+            reply = build_blocking_request do |fiber|
+              build_command(fiber) do
+                Platforms::Functions.pread(fd, buffer, nbytes, offset)
+              end
+            end
+
+            #Policy.check(reply)
+            reply
+          end
+
+          def pwrite(fd:, buffer:, nbytes:, offset:, timeout:)
+            reply = build_blocking_request do |fiber|
+              build_command(fiber) do
+                Platforms::Functions.pwrite(fd, buffer, nbytes, offset)
               end
             end
 
