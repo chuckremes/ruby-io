@@ -45,7 +45,7 @@ class IO
             reply
           end
 
-          def wwrite(fd:, buffer:, nbytes:, offset:, timeout:)
+          def pwrite(fd:, buffer:, nbytes:, offset:, timeout:)
             reply = Platforms::Functions.pwrite(fd, buffer, nbytes, offset)
 
             #Policy.check(reply)
