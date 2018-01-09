@@ -91,19 +91,19 @@ Benchmark.ips do |x|
     end
   end
 
-  x.report("sync each, native IO") do |times|
-    nativeio_times += times
-    i = 0
-    while i < times
-      regular_ruby.rewind
-      regular_ruby.each(5) do |line|
-        nativeio_iterations += 1
-        raise "read error, regular ruby" if line.size < 0
-        # no op
-      end
-      i += 1
-    end
-  end
+#  x.report("sync each, native IO") do |times|
+#    nativeio_times += times
+#    i = 0
+#    while i < times
+#      regular_ruby.rewind
+#      regular_ruby.each(5) do |line|
+#        nativeio_iterations += 1
+#        raise "read error, regular ruby" if line.size < 0
+#        # no op
+#      end
+#      i += 1
+#    end
+#  end
 
   # Compare the iterations per second of the various reports!
   x.compare!
