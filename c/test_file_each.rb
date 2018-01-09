@@ -14,7 +14,7 @@ io = IO::Sync::File.open(path: '/tmp/t', flags: flags.create.readwrite.truncate)
 p io.write(string: string, offset: 0)
 #p io.read(nbytes: 4000, offset: 0)
 i = 0
-io.each(limit: 5) do |str, rc, errno|
+io.each(limit: 5) do |rc, errno, str, new_offset|
   raise "read error, rc [#{rc}], errno [#{errno}]" if rc < 0
   i += 1
 

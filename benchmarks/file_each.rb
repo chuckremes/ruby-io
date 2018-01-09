@@ -50,7 +50,7 @@ Benchmark.ips do |x|
     newio_times += times
     i = 0
     while i < times
-      sync_io_buffered.each(limit: 5) do |str|
+      sync_io_buffered.each(limit: 5) do |rc, errno, str, offset|
         # no op
         newio_iterations += 1
       end
@@ -61,7 +61,7 @@ Benchmark.ips do |x|
   x.report("sync each, unbuffered") do |times|
     i = 0
     while i < times
-      sync_io_unbuffered.each(limit: 5) do |str, rc, errno|
+      sync_io_unbuffered.each(limit: 5) do |rc, errno, str, offset|
         raise "read error, rc [#{rc}], errno [#{errno}]" if rc < 0
         # no op
       end
@@ -72,7 +72,7 @@ Benchmark.ips do |x|
   x.report("async each, buffered") do |times|
     i = 0
     while i < times
-      async_io_buffered.each(limit: 5) do |str, rc, errno|
+      async_io_buffered.each(limit: 5) do |rc, errno, str, offset|
         raise "read error, rc [#{rc}], errno [#{errno}]" if rc < 0
         # no op
       end
@@ -83,7 +83,7 @@ Benchmark.ips do |x|
   x.report("async each, unbuffered") do |times|
     i = 0
     while i < times
-      async_io_buffered.each(limit: 5) do |str, rc, errno|
+      async_io_buffered.each(limit: 5) do |rc, errno, str, offset|
         raise "read error, rc [#{rc}], errno [#{errno}]" if rc < 0
         # no op
       end
