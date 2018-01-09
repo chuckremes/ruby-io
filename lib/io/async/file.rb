@@ -6,6 +6,8 @@ require 'io/internal/states/file/writeonly'
 class IO
   module Async
     class File
+      include Mixins::Enumerable
+
       class << self
         def open(path:, flags: nil, timeout: nil, error_policy: nil)
           Private.setup

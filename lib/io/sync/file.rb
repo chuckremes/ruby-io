@@ -6,7 +6,7 @@ require 'io/internal/states/file/writeonly'
 class IO
   module Sync
     class File
-      include Mixins::BufferedEnumerable
+      include Mixins::Enumerable
 
       class << self
         def open(path:, flags: nil, error_policy: nil)

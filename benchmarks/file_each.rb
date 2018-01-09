@@ -10,25 +10,25 @@ sync_io_unbuffered = IO::Sync::File.open(
   path: file_path,
   flags: flags.readonly
 )
-sync_io_unbuffered.extend(IO::Mixins::Enumerable)
+sync_io_unbuffered.extend(IO::Mixins::UnbufferedEnumerable)
 
 sync_io_buffered = IO::Sync::File.open(
   path: file_path,
   flags: flags.readonly
 )
-sync_io_buffered.extend(IO::Mixins::BufferedEnumerable)
+sync_io_buffered.extend(IO::Mixins::Enumerable)
 
 async_io_unbuffered = IO::Async::File.open(
   path: file_path,
   flags: flags.readonly
 )
-async_io_unbuffered.extend(IO::Mixins::Enumerable)
+async_io_unbuffered.extend(IO::Mixins::UnbufferedEnumerable)
 
 async_io_buffered = IO::Async::File.open(
   path: file_path,
   flags: flags.readonly
 )
-async_io_buffered.extend(IO::Mixins::BufferedEnumerable)
+async_io_buffered.extend(IO::Mixins::Enumerable)
 
 regular_ruby = File.open(
   file_path,

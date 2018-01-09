@@ -30,11 +30,13 @@ Tested and working on:
 
 ## To Do Before First Public Release as Gem
 * Initial #each implementation
+  ** Convert Enumerable to buffered version; make a UnbufferedEnumerable as a subclass
 * Initial IO::Transpose wrapper implementation
 * Start documentation with examples
 * Stub Error/Exception hierarchy
 * Hook up Error Policy for return codes and exceptions
 * Modify all methods to return a Result object instead of an array or hash
+  ** If I go this direction, the Result object should be created as close to the code boundary as possible
 * Sketch out remaining class inheritance and put in stubs (UDP, Pipe, RAW, FIFO/NamedPipe, IOCTL, TTY, StringIO, Stat, Utils)
 
 ## To Do
