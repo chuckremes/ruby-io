@@ -46,11 +46,20 @@ class IO
           end
 
           def pread(fd:, buffer:, nbytes:, offset:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.pread(fd, buffer, nbytes, offset)
-              end
-            end
+            request = IO::Async::Private::Request::PRead.new(
+              Fiber.current,
+              fd: fd,
+              buffer: buffer,
+              nbytes: nbytes,
+              offset: offset,
+              timeout: timeout
+            )
+            reply = enqueue(request)
+            #            build_blocking_request do |fiber|
+            #              build_command(fiber) do
+            #                Platforms::Functions.pread(fd, buffer, nbytes, offset)
+            #              end
+            #            end
           end
 
           def pwrite(fd:, buffer:, nbytes:, offset:, timeout:)
@@ -146,23 +155,23 @@ class IO
             request = IO::Async::Private::Request::BlockingCommand.new(fiber: Fiber.current) do |fiber|
               yield(fiber)
             end
-          
+
             reply = enqueue(request)
           end
-          
+
           def build_poll_read_request(repeat:, fd:)
             request = IO::Async::Private::Request::NonblockingReadCommand.new(fiber: Fiber.current, fd: fd) do |fiber|
               yield(fiber)
             end
-          
+
             reply = enqueue(request)
           end
-          
+
           def build_poll_write_request(repeat:, fd:)
             request = IO::Async::Private::Request::NonblockingWriteCommand.new(fiber: Fiber.current, fd: fd) do |fiber|
               yield(fiber)
             end
-          
+
             reply = enqueue(request)
           end
 
@@ -190,7 +199,7 @@ class IO
           def next_sequence_number
             Fiber.current.local[:sequence_no] += 1
           end
-        
+
           def setup
             Configure.setup
           end
