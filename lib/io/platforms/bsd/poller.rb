@@ -160,7 +160,7 @@ class IO
         begin
           reply = Platforms::Functions.read(@self_pipe, @self_pipe_buffer, SELF_PIPE_READ_SIZE)
           rc = reply[:rc]
-        end until rc.zero? || rc == -1
+        end until rc.zero? || rc == -1 || rc < SELF_PIPE_READ_SIZE
         # necessary to reregister since everything is setup for ONESHOT
         register_read(fd: @self_pipe, request: :self_pipe)
       end
