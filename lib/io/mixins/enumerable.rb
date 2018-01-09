@@ -1,5 +1,11 @@
 class IO
   module Mixins
+    #
+    #  io = File.open(path: 'path/to/file', flags: Config::DefaultFlags)
+    #  io.each(limit: 5, offset: 0) do |rc, errno, string, new_offset|
+    #    ...
+    #  end
+    #
     module Enumerable
 
       # The bare-bones EachReader. This treats everything as ASCII_8BIT and
@@ -54,12 +60,8 @@ class IO
               timeout: @timeout
             )
 
-            if rc < 0
-              yield(nil, rc, errno)
-            else
-              yield(buffer, rc, nil)
-              offset += rc
-            end
+            offset += rc if rc > 0
+            yield(rc, errno, buffer, offset)
           end until rc.zero? # end of file
         end
 
@@ -67,41 +69,39 @@ class IO
           if limit > @saved_buffer.size
             # we cannot satisfy request from saved bytes
             # so try to read another full buffer from FD
-            rc, errno, buffer = io.read(
+            rc, errno, buffer, offset = io.read(
               nbytes: READ_SIZE,
               offset: offset + @saved_buffer.size, # move offset past remaining buffer
               buffer: @read_buffer,
               timeout: timeout
             )
 
-            if rc < 0
-              # failure
-              [nil, rc, errno]
+            # failure
+            return [rc, errno, nil] if rc < 0
+
+            # @saved_buffer may have data or may be 0 on first time through;
+            # we need the MINIMUM of our limit minus saved buffer OR the
+            # total bytes read just now
+            bytes_needed = [limit - @saved_buffer.size, rc].min
+
+            # prepare string to return to caller by combining any saved
+            # bytes and reading +bytes_needed+ bytes from refilled buffer
+            string_buffer = if bytes_needed > 0
+              # minimize String copying by only doing this append when bytes available
+              @saved_buffer << @read_buffer.get_bytes(0, bytes_needed)
             else
-              # @saved_buffer may have data or may be 0 on first time through;
-              # we need the MINIMUM of our limit minus saved buffer OR the
-              # total bytes read just now
-              bytes_needed = [limit - @saved_buffer.size, rc].min
-
-              # prepare string to return to caller by combining any saved
-              # bytes and reading +bytes_needed+ bytes from refilled buffer
-              string_buffer = if bytes_needed > 0
-                # minimize String copying by only doing this append when bytes available
-                @saved_buffer << @read_buffer.get_bytes(0, bytes_needed)
-              else
-                @saved_buffer
-              end
-
-              # lastly, we may have bytes left in read buffer; save the unused
-              # bytes for a future request; if at EOF, this is 0
-              @saved_buffer = if (rc - bytes_needed) > 0
-                @read_buffer.get_bytes(bytes_needed, rc - bytes_needed)
-              else
-                String.new
-              end
-
-              [string_buffer.size, nil, string_buffer]
+              @saved_buffer
             end
+
+            # lastly, we may have bytes left in read buffer; save the unused
+            # bytes for a future request; if at EOF, this is 0
+            @saved_buffer = if (rc - bytes_needed) > 0
+              @read_buffer.get_bytes(bytes_needed, rc - bytes_needed)
+            else
+              String.new
+            end
+
+            [string_buffer.size, nil, string_buffer]
           elsif limit <= @saved_buffer.size
 
             # we can satisfy entire request from buffered bytes
@@ -121,8 +121,8 @@ class IO
       end
 
       def each_byte(offset:, timeout: nil)
-        each(limit: 1, offset: offset, timeout: timeout) do |byte, rc, errno|
-          yield(byte, rc, errno)
+        each(limit: 1, offset: offset, timeout: timeout) do |rc, errno, byte, offset|
+          yield(rc, errno, byte, offset)
         end
       end
     end
@@ -158,18 +158,16 @@ class IO
         end
 
         def read_from_storage(io:, limit:, offset:, timeout:)
-          rc, errno, buffer = io.read(
+          rc, errno, buffer, offset = io.read(
             nbytes: limit,
             offset: offset,
             buffer: @read_buffer,
             timeout: timeout
           )
 
-          if rc < 0
-            [nil, rc, errno]
-          else
-            [rc, nil, @read_buffer.get_bytes(0, rc)]
-          end
+          return [nil, rc, errno] if rc < 0
+
+          [rc, nil, @read_buffer.get_bytes(0, rc)]
         end
       end
 
@@ -182,8 +180,8 @@ class IO
       end
 
       def each_byte(offset:, timeout: nil)
-        each(limit: 1, offset: offset, timeout: timeout) do |byte, rc, errno|
-          yield(byte, rc, errno)
+        each(limit: 1, offset: offset, timeout: timeout) do |rc, errno, byte, offset|
+          yield(rc, errno, byte, offset)
         end
       end
     end

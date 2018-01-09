@@ -53,27 +53,48 @@ class IO
       end
 
       def close(timeout: nil)
-        rc, errno = safe_delegation do |context|
+        safe_delegation do |context|
           rc, errno, behavior = context.close
           [rc, errno]
         end
-        [rc, errno]
       end
 
+      # Reads +nbytes+ starting at +offset+ from the file and puts
+      # the result into +buffer+. Buffer must be a FFI::MemoryPointer
+      # large enough to accommodate +nbytes+.
+      #
+      # When no +buffer+ is given by the user, the system will allocate
+      # its own. Given a successful read operation, this method will return
+      # an array in the order:
+      #  [return_code, error_number, string, new_offset]
+      #
+      # When user has provided their own buffer, a successful read operation
+      # will return an array in the order:
+      #  [return_code, error_number, nil, new_offset]
+      #
+      # In this case, the user is expected to extract the string from the
+      # +buffer+ manually.
+      #
       def read(nbytes:, offset:, buffer: nil, timeout: nil)
-        rc, errno, buffer = safe_delegation do |context|
-          rc, errno = context.read(nbytes: nbytes, offset: offset, buffer: buffer, timeout: timeout)
-          [rc, errno, buffer]
+        safe_delegation do |context|
+          rc, errno, string = context.read(nbytes: nbytes, offset: offset, buffer: buffer, timeout: timeout)
+
+          offset = rc >= 0 ? offset + rc : offset
+          block_given? ? yield([rc, errno, string, offset]) : [rc, errno, string, offset]
         end
-        [rc, errno, buffer]
       end
 
+      # Writes +string.bytesize+ bytes starting at +offset+ into file.
+      #
+      # A successful write returns an array in the order:
+      #  [return_code, error_number, new_offset]
+      #
       def write(offset:, string:, timeout: nil)
-        rc, errno = safe_delegation do |context|
+        safe_delegation do |context|
           rc, errno = context.write(offset: offset, string: string, timeout: timeout)
-          [rc, errno]
+          offset = rc >= 0 ? offset + rc : offset
+          block_given? ? yield([rc, errno, offset]) : [rc, errno, offset]
         end
-        [rc, errno]
       end
 
 

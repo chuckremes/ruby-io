@@ -31,9 +31,17 @@ class IO
           end
 
           def read(nbytes:, offset:, buffer: nil, timeout: nil)
-            buffer ||= ::FFI::MemoryPointer.new(nbytes)
-            reply = @backend.pread(fd: @fd, buffer: buffer, nbytes: nbytes, offset: offset, timeout: timeout)
-            [reply[:rc], reply[:errno], buffer.read_string]
+            read_buffer = buffer || ::FFI::MemoryPointer.new(nbytes)
+            reply = @backend.pread(fd: @fd, buffer: read_buffer, nbytes: nbytes, offset: offset, timeout: timeout)
+
+            string = if reply[:rc] >= 0
+              # only return a string if user didn't pass in their own buffer
+              buffer ? nil : buffer.read_string
+            else
+              nil
+            end
+
+            [reply[:rc], reply[:errno], string]
           end
 
           def write(offset:, string:, timeout: nil)
