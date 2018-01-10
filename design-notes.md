@@ -677,6 +677,28 @@ BUT, not all use cases allow for buffered reads. Some require UNbuffered reads..
 
 Is the last sentence true? I hope it isn't... then this gets easy because I can push the buffering down a level.
 
+Next morning... dreamt about this last night. Here's the plan.
+For Block child classes (File, String, anything with random access that allows seek) we will NOT buffer in the IO class. The buffering can happen in the Enumerable. For Stream child classes (Pipe, Socket) we will use #read (not #pread) and buffer in the IO class. The Enumerable will not do buffering.
+
+When Transcoder wraps one of these IO classes, it can check `is_a?` and decide which Enumerable to load... Enumerable::Block or Enumerable::Stream.
+
+Also had some random thoughts about #read/#pread in the Transcoder wrapper, but they are fuzzy now... not sure what I was thinking there. Oh! To make Enumerable simpler, push the buffering logic into the #read/#pread of the Transcoder class. This way the Enumerable just resets its offset to whatever and the next read should satisfy as much as possible out of the buffer, if any. Need to be clever to make this caching work for #pread so we'll need to track `offset` internally to that method.
+
+In Enumerable::Block#read, we'll make sure that it always allocates its own buffer. #read_from_storage will pass nil for buffer:. Anyway, the #read/#pread should allocate a large reusable buffer (32k?) starting from the offset requested. It will only return the requests nbytes though and hang on to the rest. Next time a read request comes in, it will check to see if it overlaps the existing buffer. If so, satisfy it directly from the buffer otherwise satisfy as much as possible from buffer and then read another 32k.
+
+In Enumerable::Stram#read, this will just delegate directly to @io.read. That method will be similar to Enumerble::Block#pread in the sense that it will also allocate its own buffer by default and try to satisfy requests out of it. If the user passes their own buffer in to the Stream#read, we can fake things out by copying from our internal buffer to the user's buffer. memcpy should be fast!
+
+Just got back from walking the dogs and have more clarity on this issue. The idea of unbuffered reads is dead. I ran through a lot of scenarios to try and prove its worth, but I can't. The only situation where it gets a bit dicey is memory consumption. If there are a lot of IO objects each with their own 32k buffer, things could get tight on an embedded system. The solution there is to provide a global configuration mechanism for setting the default buffer size to a different value. Put a lower bound on it (128 bytes?) so that we can continue to take advantage of some small buffering for Transcoding performance.
+
+So this means that *all* IO classes will handle read buffering. I'll need to create a ReadCache class that can populate itself and invalidate itself, etc. Thought about write buffering but the OS does a better job than I ever could so all writes will go direct to a syscall. This neatly sidesteps any issues of invalidating a read cache because a write changed some bytes overlapping with the cache.
+
+The idea of splitting buffering between Enumerable::Block and IO::Stream just didn't sit well with me. This decision to put all buffering into IO::Block and IO::Stream is much better.
+
+READ CACHE
+All reads go through here. If the read request can be fully accommodated by the cache, it copies the buffer and returns. If the request overlaps the end of the buffer (but still fits within total size) then it issues a new read from that offset to replace the cache and then copies the substring back. If the request is larger than the cache, invalidate the cache and pass the request straight through to __read__. Do not try to cache those large reads.
+
+As a side benefit, __read__ will be available for truly unbuffered reads. Anyone who wants/needs that can use it directly.
+
 ## SyncIO::Config
 
 API for creating configuration objects used to open new IO streams. A file can be specified by either a path or a file descriptor (but not both). Similarly, files can be opened in different modes and with different flags. Rather than try to design a method to handle all of these different combinations (with its attendant complex method signature) we provide a configuration object facility which enforces the appropriate rules.
