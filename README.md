@@ -32,6 +32,7 @@ Tested and working on:
 * Initial IO::Transpose wrapper implementation
   ** ASCII_8BIT so we can get #each with a +separator+
   ** UTF-8 so I can flesh out the #read_to_char_boundary logic
+  ** Will need to refactor EachReader class(es) so random IO can use pread/pwrite and streaming IO uses read/write; remaining logic should be unchanged
 * Start documentation with examples
 * Stub Error/Exception hierarchy
 * Hook up Error Policy for return codes and exceptions
