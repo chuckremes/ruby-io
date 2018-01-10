@@ -49,19 +49,31 @@ class IO
         end
 
         def read_to_limit(&block)
-          wanted = limit = @limit
+          read_to(size: @limit) do |rc, errno, buffer, offset|
+            if rc >= 0
+              offset += rc
+              yield(rc, errno, buffer, offset)
+            else
+              yield(rc, errno, nil, offset)
+            end
+
+            # must return this as value of block so #read_to can update *offset*
+            offset
+          end
+        end
+
+        def read_to(size:, &block)
           offset = @offset
 
           begin
             rc, errno, buffer = read_from_storage(
               io: @io,
-              limit: @limit,
+              limit: size,
               offset: offset,
               timeout: @timeout
             )
 
-            offset += rc if rc > 0
-            yield(rc, errno, buffer, offset)
+            offset = yield(rc, errno, buffer, offset)
           end until rc.zero? # end of file
         end
 
