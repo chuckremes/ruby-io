@@ -17,6 +17,10 @@ class IO
           end
 
           def read(nbytes:, offset:, buffer: nil, timeout: nil)
+            __pread__(nbytes: nbytes, offset: offset, buffer: buffer, timeout: timeout)
+          end
+
+          def __pread__(nbytes:, offset:, buffer: nil, timeout: nil)
             [-1, Errno::EBADF]
           end
 

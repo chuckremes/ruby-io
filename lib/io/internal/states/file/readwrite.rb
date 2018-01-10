@@ -3,9 +3,10 @@ class IO
     module States
       class File
         class ReadWrite
-          def initialize(fd:, backend:)
+          def initialize(fd:, backend:, read_cache:)
             @fd = fd
             @backend = backend
+            @read_cache = read_cache
           end
 
           def to_i
@@ -30,7 +31,19 @@ class IO
             end
           end
 
+          # Buffered read, falls through to __pread__ to refresh or pass through cache.
           def read(nbytes:, offset:, buffer: nil, timeout: nil)
+            @read_cache.pread(
+              nbytes: nbytes,
+              offset: offset,
+              buffer: buffer,
+              timeout: timeout
+            )
+          end
+
+          # Unbuffered read
+          #
+          def __pread__(nbytes:, offset:, buffer: nil, timeout: nil)
             read_buffer = buffer || ::FFI::MemoryPointer.new(nbytes)
             reply = @backend.pread(fd: @fd, buffer: read_buffer, nbytes: nbytes, offset: offset, timeout: timeout)
 
@@ -49,6 +62,7 @@ class IO
             buffer = ::FFI::MemoryPointer.new(nbytes)
             buffer.write_string(string)
             reply = @backend.pwrite(fd: @fd, buffer: buffer, nbytes: nbytes, offset: offset, timeout: timeout)
+            @read_cache.write_invalidation(offset: offset) if reply[:rc] > 0
             [reply[:rc], reply[:errno]]
           end
         end

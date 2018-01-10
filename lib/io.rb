@@ -18,6 +18,7 @@ end
 require_relative 'io/internal/local'
 require_relative 'io/internal/fiber'
 require_relative 'io/internal/thread'
+require_relative 'io/internal/read_cache'
 require_relative 'io/internal/backend/error_policy'
 require_relative 'io/internal/backend/multithread_policy'
 

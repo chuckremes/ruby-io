@@ -32,13 +32,14 @@ class IO
       def initialize(fd:, flags:, mode:, state: :readonly, error_policy:)
         @creator = Thread.current
         @policy = error_policy || Config::Defaults.error_policy
+        read_cache = Internal::PReadCache.new(io: self, size: Config::Defaults.read_cache_size)
 
         @context = if :readonly == state
-          Internal::States::File::ReadOnly.new(fd: fd, backend: Internal::Backend::Sync)
+          Internal::States::File::ReadOnly.new(fd: fd, backend: Internal::Backend::Sync, read_cache: read_cache)
         elsif :writeonly == state
           Internal::States::File::WriteOnly.new(fd: fd, backend: Internal::Backend::Sync)
         elsif :readwrite == state
-          Internal::States::File::ReadWrite.new(fd: fd, backend: Internal::Backend::Sync)
+          Internal::States::File::ReadWrite.new(fd: fd, backend: Internal::Backend::Sync, read_cache: read_cache)
         else
           Internal::States::File::Closed.new(fd: -1, backend: Internal::Backend::Sync)
         end
@@ -76,6 +77,15 @@ class IO
       def read(nbytes:, offset:, buffer: nil, timeout: nil)
         safe_delegation do |context|
           rc, errno, string = context.read(nbytes: nbytes, offset: offset, buffer: buffer, timeout: timeout)
+
+          offset = rc >= 0 ? offset + rc : offset
+          block_given? ? yield([rc, errno, string, offset]) : [rc, errno, string, offset]
+        end
+      end
+
+      def __pread__(nbytes:, offset:, buffer: nil, timeout: nil)
+        safe_delegation do |context|
+          rc, errno, string = context.__pread__(nbytes: nbytes, offset: offset, buffer: buffer, timeout: timeout)
 
           offset = rc >= 0 ? offset + rc : offset
           block_given? ? yield([rc, errno, string, offset]) : [rc, errno, string, offset]
