@@ -1,7 +1,7 @@
 $: << '../lib'
 require 'io'
 
-string = '0123456789' * 2
+string = '0123456789abcdefghij'
 string += '012'
 
 flags = IO::Config::Flags.new
@@ -20,8 +20,8 @@ io.each(limit: 5) do |rc, errno, str, new_offset|
 
   if i == 3
     addition = 'ABCDE'
-    p io.write(string: addition, offset: string.size)
-    puts "WROTE / appended [#{addition.size}] bytes to offset [#{string.size}]"
+    rc, errno, offset = io.write(string: addition, offset: string.size)
+    puts "WROTE / appended [#{addition.size}] bytes to offset [#{string.size}], rc [#{rc}], errno [#{errno}], offset [#{offset}]"
   end
   # if bytes read is 0, then we hit EOF and this block will exit before next iteration
   puts "[#{str}], string bytes [#{str.bytesize}], bytes read [#{rc}]"
