@@ -1,7 +1,7 @@
 class IO
   # Should provide methods identical to those in the Sync/Async classes
   # for reading/writing/sending/receiving data. When creating a Transcode
-  # wrapper, the user specifies the destination encoding. 
+  # wrapper, the user specifies the destination encoding.
   #
   # Since all IO
   # is performed using ASCII_8BIT, this class is responsible for formatting
@@ -18,6 +18,12 @@ class IO
   # object, some transcoding may need to take place.
   #
   class Transcode
+    LF = "\n"
+    CR = "\r"
+    NEWLINE = ::FFI::Platform::IS_WINDOWS ? CR+LF : LF
+
+    SEPARATOR = NEWLINE
+
     # Envisioning that some transcoding may require some nonstandard
     # support. Using the factory method to create the Transcode class let's
     # it pick the appropriate supporting class and instantiate it directly.
@@ -31,24 +37,57 @@ class IO
       case encoding
       when Encoding::UTF_8
         UTF8.new(io: io)
+      when nil
+        ASCII_8BIT.new(io: io)
       else
         raise "unknown encoding [#{encoding.name}]"
       end
     end
-    
+
     def initialize(io:, encoding:)
       @io = io
       @encoding = encoding # sanity check that this is correct type
     end
   end
-  
+
+  class ASCII_8BIT < Transcode
+    def initialize(io:)
+      super(io: io, encoding: Encoding::ASCII_8BIT)
+    end
+
+    # +limit+ nil means program should return up to +separator+ or the
+    # whole file is +separator+ is also nil.
+    #
+    # +separator+ defaults to newline (\n on most systems, \r\n on Windows).
+    #
+    def each(limit: nil, separator: NEWLINE, offset: 0, timeout: nil, &block)
+      EachReaders::ASCII_8BIT.new(
+        io: @io,
+        limit: limit,
+        separator: separator,
+        offset: offset,
+        timeout: timeout
+      ).each(&block)
+
+      self
+    end
+  end
+
   class UTF8 < Transcode
     def initialize(io:)
       super(io: io, encoding: Encoding::UTF_8)
     end
 
-    def each(limit:, separator:, skip:, offset: 0, timeout: nil)
-      
+    def each(limit: nil, separator: NEWLINE, offset: 0, timeout: nil, &block)
+      EachReaders::UTF_8.new(
+        io: @io,
+        limit: limit,
+        separator: separator,
+        offset: offset,
+        timeout: timeout
+      ).each(&block)
+
+      self
     end
   end
 end

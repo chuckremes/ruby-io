@@ -43,3 +43,8 @@ require_relative 'io/async/timer'
 require_relative 'io/async/fcntl'
 require_relative 'io/async/file'
 require_relative 'io/async/tcp'
+
+# transcoder
+require_relative 'io/transcode/transcode'
+require_relative 'io/transcode/each_readers/ascii_8bit'
+require_relative 'io/transcode/each_readers/utf_8'
