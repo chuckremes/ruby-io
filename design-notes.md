@@ -323,6 +323,10 @@ The core IO classes deal with 8-bit bytes exclusively. They have no notion of "c
 
 Had a wild idea while walking the dogs tonight. Instead of requiring everyone to wrap their IO object in a Transcoder, let the factory methods creating IO objects take an encoding option. If it's anything other than ASCII_8BIT, use a trick learned from Celluloid that let's the #new return a different object. The object would be the transcoder (same API as a regular IO object) and it would be completely transparent. I froget the technique but it had something to do with overriding #allocate I think.
 
+While working on the ASCII_8BIT transcoder, it became clear that buffered reads are a must. Right now the EachReader class(es) handle the buffering. It returns the correct number of bytes requested and buffers the additional bytes internally. This works fine for random IO types like File and String, but it will break for streaming IO like pipes and sockets. Why? Well, for one, those will need to use read/write instead of pread/pwrite (no seeking allowed). Two, if the EachReader class is internally buffering some bytes read from a stream and it exits early (e.g. `return` called from within a block) then those extra buffered bytes will be lost. Subsequent reads from the stream will show a gap. So, ultimately we will need to push the buffering down into the read/write methods for Socket/Pipe/Stream. All the buffering code in EachReader will then likely be superfluous and will need to be removed.
+
+Let's see what happens.
+
 ONLY LOAD WHAT WE NEED
 Restructure so that we can load only what we want/need. e.g.
   require 'io/async' # loads io/config, io/private, io/async and subdirs
@@ -656,6 +660,22 @@ puts "size #{utf8.size}, bytesize #{utf8.bytesize}" => size 256, bytesize 384
 bytes = utf8.unpack("C*")
 
 Turns out that representing 0 to 255 (integer) in UTF-8 takes 384 bytes. From 0 to 127 UTF-8 can represent normal ASCII in a single byte. For 128 to 255, it takes a second byte to represent the codepoint.
+
+GEM COMPATIBILITY or COMPATIBILITY WITH OLD IO API
+Create monkey patches for a few popular gems; for example, pick one or two HTTP gems and monkey patch them to use the new IO routines. Do same for a redis gem. Maybe do same for Webrick and its dependencies to show off better scalability?
+
+BUFFERED IO
+The Encodings support in the Transcoder is forcing me to confront the issue of IO buffering. The issue stems from unicode where a char/character may require multiple bytes to form. When we try to iterate a file with a limit of (for example) 50, this is easily handled for ASCII_8BIT. 50 bytes is 50 chars. For UTF-8, 50 bytes might be only 25 chars. We need to read additional bytes to finalize the request.
+
+Every syscall is expensive. If sync, it may block. If async, there's the expense of sending the request through the Fiber Scheduler to the IOLoop and getting the answer back. We want to minimize syscalls and this other machinery. So, we've been buffering in the EachReader class. This works fine for the average case reading from a file.
+
+However, reading from a stream (socket, pipe) that cannot seek is a major problem. If we read more than we need into a buffer, exiting the EachReader early loses that buffered information. When the EachReader goes away, any bytes read from the stream will likewise be released.
+
+So, now it makes sense to push the buffering down a level. Push it to the base IO object. If EachReader exits early, then the buffered bytes can be "unget" back to the IO class and a subsequent read will retrieve them.
+
+BUT, not all use cases allow for buffered reads. Some require UNbuffered reads...
+
+Is the last sentence true? I hope it isn't... then this gets easy because I can push the buffering down a level.
 
 ## SyncIO::Config
 
