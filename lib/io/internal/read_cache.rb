@@ -60,7 +60,7 @@ class IO
         #          offset = offset < 0 ? 0 : offset
         #        end
 
-        #puts "refresh_cache, trying to read from offset [#{offset}]"
+        #puts "refresh_cache, trying to read from offset [#{offset}], read ahead [#{@read_ahead_size}]"
         rc, errno, ignore = @io.__pread__(
           nbytes: @read_ahead_size,
           offset: offset,
@@ -68,7 +68,7 @@ class IO
           timeout: timeout
         )
 
-        #puts "#{self.class}#refresh_cache, rc [#{rc}], errno [#{errno}], cache [\n#{@cache.get_bytes(0, rc)}\n]"
+        #puts "#{self.class}#refresh_cache, rc [#{rc}], errno [#{errno}]"
         return [rc, errno, ignore] if rc < 0
 
         # successful read!
@@ -82,9 +82,12 @@ class IO
       def from_cache(nbytes:, offset:, buffer:)
         #puts "from_cache!"
         # cannot return more than @cache_length - relative_offset bytes, so sanity check!
-        length = [nbytes, @cache_length - relative_offset(offset)].min
+        adjusted_offset = relative_offset(offset)
+        length = nbytes > (@cache_length - adjusted_offset) ?
+          (@cache_length - adjusted_offset) :
+          nbytes
         length = length < 0 ? 0 : length # negative check!
-        string = @cache.get_bytes(relative_offset(offset), length)
+        string = @cache.get_bytes(adjusted_offset, length)
 
         #puts "from_cache, offset [#{offset}], rel_offset [#{relative_offset(offset)}], length [#{length}], string.size [#{string.size}], [\n#{string.inspect}\n]"
         if buffer
@@ -114,10 +117,11 @@ class IO
       # 2. Offset + nbytes overlaps the cache end
       #
       def blown_cache?(nbytes:, offset:)
-        adjusted_offset = relative_offset(offset)
+        between = !offset.between?(@cache_offset_begin, @cache_offset_end)
+        overlap_end =  (relative_offset(offset) + nbytes) > @cache_offset_end
+        #puts "blown_cache?, between [#{between}], overlap [#{overlap_end}]"
 
-        !adjusted_offset.between?(@cache_offset_begin, @cache_offset_end) ||
-          (adjusted_offset + nbytes) > @cache_offset_end
+        between || overlap_end
       end
     end
   end
