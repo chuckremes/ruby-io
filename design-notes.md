@@ -799,12 +799,5 @@ If blk is given, passes the SyncIO instance to the block for operations. Upon ex
 
 * 
 
-
-NEXT STEPS
-* Write Async::TCP to mimic Sync::TCP
-  ** Consider creating Internal::Backend::Sync and Async. The Sync would essentially call Platforms::Functions. The Async would call Async::Private to execute the function wrappers.
-* Look at refactoring to share code but DO NOT DO IT (except for Structs though be careful about sync calls)
-* Add kqueue Poller to support `accept`
-* Add send/recv for Async sockets
-* Add send/recv for Sync sockets
-* REFACTOR
+FUTURE THOUGHTS... RUBY MESH
+One of the inspirations for writing this library was to have a solid foundation for building out a distributed processing library (could be Actors, could be a distributed async-await, could be dRuby on steriods, etc). While walking the dogs, I got stuck on the issue of discoverability. Look at the [RINA stuff](http://pouzinsociety.org) which seems to be full of interesting ideas along these lines.

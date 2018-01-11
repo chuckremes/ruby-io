@@ -36,7 +36,7 @@
 
     There is tremendous overlap between these calls which leads to confusion as to which one is correct to use for a given problem. This project will simplify that choice.
 
-5. Will this project support my ancient operating system and it's possibly weird system calls?
+5. Will this project support my ancient operating system and its possibly weird system calls?
 
     A. Target is to support POSIX as a baseline. If the ancient system conforms to POSIX, then it will be supported. As a general rule of thumb, if the operating system is earlier than Linux kernel 4.1, OSX 10.12, Windows 10, FreeBSD 11, OpenBSD 6, or NetBSD 7 then support will be spotty. Patches to the core system to support older systems will likely not be accepted; instead, a `ruby-io-patches` project could be created to collect patches for older systems and loaded only when necessary. I do not intend to pollute the core library to support systems 10+ years old.
 

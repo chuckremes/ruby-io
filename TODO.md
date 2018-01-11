@@ -10,6 +10,7 @@
 * Modify all methods to return a Result object instead of an array or hash
   ** If I go this direction, the Result object should be created as close to the code boundary as possible
 * Sketch out remaining class inheritance and put in stubs (UDP, Pipe, RAW, FIFO/NamedPipe, IOCTL, TTY, StringIO, Stat, Utils)
+* Add rubocop to project and fix its complaints. Make it part of the check-in process so we stay in tight conformance.
 
 ## To Do
 * Provide hooks for tracking IO statistics like bytes read/written; define API
