@@ -30,8 +30,8 @@ Tested and working on:
 
 ## To Do Before First Public Release as Gem
 * Initial IO::Transpose wrapper implementation
-  ** ASCII_8BIT so we can get #each with a +separator+
-  ** UTF-8 so I can flesh out the #read_to_char_boundary logic
+  ** ASCII_8BIT so we can get #each with a +separator+  -- done
+  ** UTF-8 so I can flesh out the #read_to_char_boundary logic -- done
   ** Will need to refactor EachReader class(es) so random IO can use pread/pwrite and streaming IO uses read/write; remaining logic should be unchanged
 * Start documentation with examples
 * Stub Error/Exception hierarchy
@@ -51,6 +51,7 @@ Tested and working on:
 * Need a supportable way to generate FFI structs for all major target platforms; considering c2ffi project (on github) but the ruby-c2ffi needs a bunch of fixes.
 * Refactor inheritance structure and break out shared code to either parent classes or (more likely) to modules to DRY things up.
 * Consider collapsing Sync & Async shell classes to a single namespace; choose sync/async in method signature (default to sync?)
+* Allow for multiple IOLoops per process; probably map threads to an IOLoop by hashing the thread's object_id to 0-N where (N-1) is number of IOLoop threads.
 
 ## Longer Term Fixes
 * Ruby bug https://bugs.ruby-lang.org/issues/9664 prevents a fiber that has ever been transferred from yielding or resuming. This makes supporting Enumerators impossible. Generally speaking, it makes supporting any other Fiber-aware code very problematic because most code in the wild uses yield/resume instead of transfer. If any of that code calls an Async IO method, the fiber will be transferred so any subsequent call to Fiber.yield or Fiber#resume will blow up.

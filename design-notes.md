@@ -699,6 +699,16 @@ All reads go through here. If the read request can be fully accommodated by the 
 
 As a side benefit, __read__ will be available for truly unbuffered reads. Anyone who wants/needs that can use it directly.
 
+NON-POSIX FUNCTIONS
+OSX has kqueue. Linux has epoll. Both have #writev, #readv, and a bunch of others that are not part of POSIX. These non-POSIX functions could be added to a PlatformsMixin... Platforms::Mixin::Linux and Platforms::Mixin::BSD or whatever. During instantiation of a class, it could do something like:
+  class Bar < Foo
+    include Platforms::Mixin::Linux if Platforms.linux?
+    include Platforms::Mixin::BSD if Platforms.bsd?
+  end
+
+This would allow us to provide support for platform-specific functions at runtime. I'm sure there's more than one way to skin this cat, so play around with a few options.
+
+
 ## SyncIO::Config
 
 API for creating configuration objects used to open new IO streams. A file can be specified by either a path or a file descriptor (but not both). Similarly, files can be opened in different modes and with different flags. Rather than try to design a method to handle all of these different combinations (with its attendant complex method signature) we provide a configuration object facility which enforces the appropriate rules.
