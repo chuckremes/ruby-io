@@ -41,7 +41,7 @@ class IO
           @timeout = timeout
 
           @saved_buffer = String.new # always returns encoding ASCII_8BIT
-          @read_buffer  = ::FFI::MemoryPointer.new(READ_SIZE)
+          #@read_buffer  = ::FFI::MemoryPointer.new(READ_SIZE)
         end
 
         def each(&block)
@@ -77,6 +77,11 @@ class IO
           end until rc.zero? # end of file
         end
 
+        # The underlying IO class performs buffering and we buffer again
+        # here. Double buffering! Seems to just about double overall perf
+        # so I'm leaving this here until I have time to investigate why.
+        # The PReadCache should be sufficient but apparently it isn't.
+        #
         def read_from_storage(io:, limit:, offset:, timeout:)
           if limit > @saved_buffer.size
             # we cannot satisfy request from saved bytes
@@ -84,7 +89,7 @@ class IO
             rc, errno, buffer, offset = io.read(
               nbytes: READ_SIZE,
               offset: offset + @saved_buffer.size, # move offset past remaining buffer
-              buffer: @read_buffer,
+              buffer: nil,
               timeout: timeout
             )
 
@@ -100,7 +105,7 @@ class IO
             # bytes and reading +bytes_needed+ bytes from refilled buffer
             string_buffer = if bytes_needed > 0
               # minimize String copying by only doing this append when bytes available
-              @saved_buffer << @read_buffer.get_bytes(0, bytes_needed)
+              @saved_buffer << buffer.slice(0, bytes_needed) #@read_buffer.get_bytes(0, bytes_needed)
             else
               @saved_buffer
             end
@@ -108,7 +113,8 @@ class IO
             # lastly, we may have bytes left in read buffer; save the unused
             # bytes for a future request; if at EOF, this is 0
             @saved_buffer = if (rc - bytes_needed) > 0
-              @read_buffer.get_bytes(bytes_needed, rc - bytes_needed)
+              #@read_buffer.get_bytes(bytes_needed, rc - bytes_needed)
+              buffer.slice(bytes_needed, rc - bytes_needed)
             else
               String.new
             end
@@ -165,21 +171,21 @@ class IO
       class UnbufferedEachReader < Enumerable::EachReader
         def initialize(io:, limit:, offset:, timeout:)
           super
-          @saved_buffer = nil
-          @read_buffer  = ::FFI::MemoryPointer.new(limit)
+          #@saved_buffer = nil
+          #@read_buffer  = ::FFI::MemoryPointer.new(limit)
         end
 
         def read_from_storage(io:, limit:, offset:, timeout:)
-          rc, errno, buffer, offset = io.read(
+          rc, errno, buffer, offset = io.__pread__(
             nbytes: limit,
             offset: offset,
-            buffer: @read_buffer,
+            buffer: nil,
             timeout: timeout
           )
 
           return [nil, rc, errno] if rc < 0
 
-          [rc, nil, @read_buffer.get_bytes(0, rc)]
+          [rc, nil, buffer]
         end
       end
 
