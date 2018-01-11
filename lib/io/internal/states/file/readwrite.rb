@@ -49,7 +49,7 @@ class IO
 
             string = if reply[:rc] >= 0
               # only return a string if user didn't pass in their own buffer
-              buffer ? nil : buffer.read_string
+              buffer ? nil : read_buffer.read_string
             else
               nil
             end
