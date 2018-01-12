@@ -28,7 +28,7 @@ class IO
             [-1, Errno::EBADF]
           end
 
-          def ssend(buffer:, flags:, timeout: nil)
+          def ssend(buffer:, nbytes:, flags:, timeout: nil)
             sendto(addr: nil, buffer: buffer, flags: flags, timeout: timeout)
           end
 
@@ -40,7 +40,7 @@ class IO
             [-1, Errno::EBADF]
           end
 
-          def recv(buffer:, flags:, timeout: nil)
+          def recv(buffer:, nbytes:, flags:, timeout: nil)
             recvfrom(addr: nil, buffer: buffer, flags: flags, timeout: timeout)
           end
 

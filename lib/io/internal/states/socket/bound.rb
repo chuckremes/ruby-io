@@ -67,7 +67,7 @@ class IO
             end
           end
 
-          def ssend(buffer:, flags:, timeout: nil)
+          def ssend(buffer:, nbytes:, flags:, timeout: nil)
             sendto(addr: nil, buffer: buffer, flags: flags, timeout: timeout)
           end
 
@@ -79,8 +79,18 @@ class IO
             [-1, Errno::EBADF]
           end
 
-          def recv(buffer:, flags:, timeout: nil)
-            recvfrom(addr: nil, buffer: buffer, flags: flags, timeout: timeout)
+          def recv(buffer:, nbytes:, flags:, timeout: nil)
+            read_buffer = buffer || ::FFI::MemoryPointer.new(nbytes)
+            reply = @backend.recv(fd: @fd, buffer: read_buffer, nbytes: nbytes, flags: flags, timeout: timeout)
+
+            string = if reply[:rc] >= 0
+              # only return a string if user didn't pass in their own buffer
+              buffer ? nil : read_buffer.read_string
+            else
+              nil
+            end
+
+            [reply[:rc], reply[:errno], string]
           end
 
           def recvfrom(addr:, buffer:, flags:, timeout: nil)
