@@ -801,3 +801,54 @@ If blk is given, passes the SyncIO instance to the block for operations. Upon ex
 
 FUTURE THOUGHTS... RUBY MESH
 One of the inspirations for writing this library was to have a solid foundation for building out a distributed processing library (could be Actors, could be a distributed async-await, could be dRuby on steriods, etc). While walking the dogs, I got stuck on the issue of discoverability. Look at the [RINA stuff](http://pouzinsociety.org) which seems to be full of interesting ideas along these lines.
+
+FIBER SCHEDULER
+While thinking about producing an "echo server" example, I realized that we couldn't easily spool up a bunch of "connect" requests. Here's the potential pseudo-code.
+
+1  10.times do |i|
+2    socket[i].connect(addr: addr) do |sock, remote_addr| # connect will suspend fiber
+3      rc, errno, string = sock.recv  # will suspend fiber
+4      # echo back
+5      sock.ssend(string) # will suspend fiber
+6      # exit block...
+7    end
+8  end
+  
+I marked each line above where the fiber will suspend. Walking through this, we will suspend on line 2 when we call #connect. When it returns, we'll spin up a new Fiber to execute the block and transfer to it. That fiber will suspend on lines 3 and 5. However, those suspensions will not pick up any execution from line 2 to line 8 and then back to top of loop. So we'll be processing the #connects in lock-step form. I don't like this.
+
+Instead, we will suspend on line 2 as before inside the #connect call. When it returns a connection, we will mark the fiber that the #connect ran in as "eligigle for more work". We'll then create a new fiber for the connect block and transfer to it. When that fiber suspends on line 3, we enter the Fiber Scheduler. We'll package up the request and send it to the IOLoop. Normally at this point we would block waiting for a response.
+
+However, I suggest that the Fiber Scheduler check for other fibers that are eligible for work and transfer back to them. In this case, we'd do something like this in the scheduler:
+
+  fiber_list.
+    select { |f| f.local[:eligible_for_work] }.
+    each { |f| f.transfer }
+
+This would find the fiber spawning the #connect requests and transfer to it. It would detect that it was resumed to do more work and continue on. It would go to line 8 and then back to line 1 for another loop iteration. Wash, rinse, repeat.
+
+Obviously we need a way to build `fiber_list` in the scheduler. Perhaps every fiber registers itself the first time it transfers into the scheduler (simplest). Anyway, once that loop finishes its 10 iterations it would go to line 9 (not shown) and continue on. When it blocks again OR exits, we're back in the fiber scheduler and can process replies, let other fibers do work, etc.
+
+STRUCTS
+Need some simple objects to return errors. e.g.
+
+class Err
+  attr_reader :rc, :errno
+  
+  def initialize(rc, errno)
+    @rc = rc
+    @errno = errno
+  end
+end
+
+Also need simple objects to return useful data to #each blocks, #accept blocks, etc.
+
+e.g.
+class EachResult
+  attr_reader :string, :offset
+  
+  ...
+end
+
+These need to be cheap and fast to allocate and populate. Structs might be a good choice though I wish they supported keyword args pre-2.5.0. 
+
+All I know is that the more I experience passing `rc, errno, string, offset` or similar long sets of arguments back through a method or into a block, the more I'm convinced these need to collapse into objects. It also future-proofs the method by allowing fields to be added without worrying about positional issues in the block's yield, etc.
