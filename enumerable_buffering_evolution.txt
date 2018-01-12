@@ -1,0 +1,114 @@
+ENUMERABLE DOES ITS OWN BUFFERING
+
+Charless-Air:ruby-io cremes$ ruby -v
+ruby 2.5.0p0 (2017-12-25 revision 61468) [x86_64-darwin16]
+Charless-Air:ruby-io cremes$ ruby benchmarks/file_each.rb 
+Warming up --------------------------------------
+ sync each, buffered     9.000  i/100ms
+sync each, unbuffered
+                         3.000  i/100ms
+async each, buffered     8.000  i/100ms
+async each, unbuffered
+                         8.000  i/100ms
+Calculating -------------------------------------
+ sync each, buffered     93.533  (±15.0%) i/s -      1.368k in  15.024666s
+sync each, unbuffered
+                         35.495  (± 5.6%) i/s -    531.000  in  15.020541s
+async each, buffered     95.735  (± 4.2%) i/s -      1.440k in  15.069619s
+async each, unbuffered
+                         95.714  (± 3.1%) i/s -      1.440k in  15.062895s
+
+Comparison:
+async each, buffered:       95.7 i/s
+async each, unbuffered:       95.7 i/s - same-ish: difference falls within error
+ sync each, buffered:       93.5 i/s - same-ish: difference falls within error
+sync each, unbuffered:       35.5 i/s - 2.70x  slower
+
+newio_iterations [15124278], nativeio_iterations [0]
+newio_times [1846], nativeio_times [0]
+Charless-Air:ruby-io cremes$ 
+Charless-Air:ruby-io cremes$ 
+
+CHANGE ENUMERABLE TO USE io.read DIRECTLY AND DISABLE ITS OWN BUFFERING
+
+Charless-Air:ruby-io cremes$ ruby benchmarks/file_each.rb 
+Warming up --------------------------------------
+ sync each, buffered     3.000  i/100ms
+sync each, unbuffered
+                         3.000  i/100ms
+async each, buffered     1.000  i/100ms
+async each, unbuffered
+                         1.000  i/100ms
+Calculating -------------------------------------
+ sync each, buffered     38.624  (± 5.2%) i/s -    579.000  in  15.037169s
+sync each, unbuffered
+                         39.247  (± 5.1%) i/s -    588.000  in  15.040233s
+async each, buffered      3.739  (± 0.0%) i/s -     57.000  in  15.252299s
+async each, unbuffered
+                          3.776  (± 0.0%) i/s -     57.000  in  15.099559s
+
+Comparison:
+sync each, unbuffered:       39.2 i/s
+ sync each, buffered:       38.6 i/s - same-ish: difference falls within error
+async each, unbuffered:        3.8 i/s - 10.39x  slower
+async each, buffered:        3.7 i/s - 10.50x  slower
+
+newio_iterations [6341382], nativeio_iterations [0]
+newio_times [774], nativeio_times [0]
+Charless-Air:ruby-io cremes$ 
+Charless-Air:ruby-io cremes$ 
+Charless-Air:ruby-io cremes$ ruby benchmarks/file_each.rb 
+Warming up --------------------------------------
+ sync each, buffered     3.000  i/100ms
+sync each, unbuffered
+                         2.000  i/100ms
+async each, buffered     1.000  i/100ms
+async each, unbuffered
+                         1.000  i/100ms
+Calculating -------------------------------------
+ sync each, buffered     38.893  (± 7.7%) i/s -    582.000  in  15.061820s
+sync each, unbuffered
+                         22.870  (± 4.4%) i/s -    344.000  in  15.097607s
+async each, buffered      3.708  (± 0.0%) i/s -     56.000  in  15.107112s
+async each, unbuffered
+                          3.727  (± 0.0%) i/s -     56.000  in  15.025695s
+
+Comparison:
+ sync each, buffered:       38.9 i/s
+sync each, unbuffered:       22.9 i/s - 1.70x  slower
+async each, unbuffered:        3.7 i/s - 10.43x  slower
+async each, buffered:        3.7 i/s - 10.49x  slower
+
+newio_iterations [6382347], nativeio_iterations [0]
+newio_times [779], nativeio_times [0]
+Charless-Air:ruby-io cremes$ 
+
+
+FIXED READ CACHE blown_cache? method
+
+Charless-Air:ruby-io cremes$ ruby benchmarks/file_each.rb 
+Warming up --------------------------------------
+ sync each, buffered     5.000  i/100ms
+sync each, unbuffered
+                         2.000  i/100ms
+async each, buffered     3.000  i/100ms
+async each, unbuffered
+                         3.000  i/100ms
+Calculating -------------------------------------
+ sync each, buffered     55.094  (± 7.3%) i/s -    825.000  in  15.078696s
+sync each, unbuffered
+                         22.534  (± 4.4%) i/s -    338.000  in  15.056846s
+async each, buffered     40.615  (± 4.9%) i/s -    609.000  in  15.041794s
+async each, unbuffered
+                         40.637  (± 7.4%) i/s -    609.000  in  15.053575s
+
+Comparison:
+ sync each, buffered:       55.1 i/s
+async each, unbuffered:       40.6 i/s - 1.36x  slower
+async each, buffered:       40.6 i/s - 1.36x  slower
+sync each, unbuffered:       22.5 i/s - 2.44x  slower
+
+newio_iterations [9045072], nativeio_iterations [0]
+newio_times [1104], nativeio_times [0]
+
+
