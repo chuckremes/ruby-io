@@ -1,3 +1,5 @@
+require 'set'
+
 class IO
   module Async
     module Private
@@ -10,6 +12,7 @@ class IO
           @inbox = Mailbox.new # replies back from IOLoop
 
           @mapper = Mapper.new
+          @known_fibers = Set.new
 
           @io_fiber = Internal::Fiber.new do |calling_fiber|
             make_io_thread
@@ -49,20 +52,25 @@ class IO
         # is submitted to the IO Thread and then we wait for a reply.
         def io_fiber_loop(originating_fiber)
           request = originating_fiber.transfer
-          save_reference(request)
-          save_reply_mailbox(request)
 
-          loop do
-            @outbox.post request
+          begin
+            post(request)
             Logger.debug(klass: self.class, name: :io_fiber_loop, message: 'waiting for reply from inbox')
             reply = @inbox.pickup(nonblocking: false)
 
             # Pass reply back to Fiber that made request
             request = lookup_reference(reply)
             request = deliver(fiber: request.fiber, reply: reply)
-            save_reference(request)
-            save_reply_mailbox(request)
-          end
+          end while true
+        end
+
+        def post(request)
+          return unless request.is_a?(Request::Command)
+
+          track_known_fibers(request)
+          save_reference(request)
+          save_reply_mailbox(request)
+          @outbox.post request
         end
 
         # Return the reply to the fiber. Suspends this fiber right here.
@@ -83,6 +91,10 @@ class IO
         def save_reply_mailbox(request)
           request.reply_to_mailbox(@inbox)
           request.finish_setup
+        end
+
+        def track_known_fibers(request)
+          @known_fibers.add(request.fiber)
         end
       end
     end
