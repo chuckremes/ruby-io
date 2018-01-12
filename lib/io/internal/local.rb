@@ -1,5 +1,3 @@
-require 'forwardable'
-
 class IO
   module Internal
     # Convenience class to be used by Thread and Fiber. Those classes
@@ -37,7 +35,16 @@ class IO
 
       def ownership_check
         return if @thread_creator == Thread.current && @fiber_creator == Fiber.current
-        raise ThreadError, "Access to local storage disallowed from non-originating thread or fiber!"
+        raise ThreadError, "Modification to local storage disallowed from non-originating thread or fiber!"
+      end
+    end
+
+    # Separate class so we can initialize some variables we need for
+    # support the Async functionality.
+    class FiberLocal < Local
+      def initialize
+        super
+        @storage[:sequence_no] = -1
       end
     end
 
@@ -47,6 +54,12 @@ class IO
     module LocalMixin
       def local
         @local ||= Local.new
+      end
+    end
+
+    module FiberLocalMixin
+      def local
+        @local ||= FiberLocal.new
       end
     end
   end
