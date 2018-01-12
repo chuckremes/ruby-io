@@ -19,7 +19,7 @@ server_thr = Thread.new do
     puts "ACCEPTED A SOCKET, rc [#{fd}], errno [#{errno}]"
     if fd >= 0
       buffer = ::FFI::MemoryPointer.new(:char, 500)
-      rc, errno = socket.recv(buffer: buffer, flags: 0)
+      rc, errno = socket.recv(nbytes: buffer.size, buffer: buffer, flags: 0)
       puts "SERVER: recv: rc [#{rc}], errno [#{errno}], string [#{buffer.read_string}]"
       p socket
       puts "SERVER: sending response"
@@ -49,7 +49,7 @@ client_thr = Thread.new do
   puts "CLIENT: about to send some data, [#{buffer.read_string}]"
   rc, errno = client.ssend(buffer: buffer, flags: 0)
   puts "CLIENT: send: rc [#{rc}], errno [#{errno}]"
-  rc, errno = client.recv(buffer: buffer, flags: 0)
+  rc, errno = client.recv(nbytes: buffer.size, buffer: buffer, flags: 0)
   puts "CLIENT: recv: rc [#{rc}], errno [#{errno}], string [#{buffer.read_string}]"
   puts 'client, closing socket'
   client.close
