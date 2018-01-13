@@ -677,6 +677,17 @@ BUT, not all use cases allow for buffered reads. Some require UNbuffered reads..
 
 Is the last sentence true? I hope it isn't... then this gets easy because I can push the buffering down a level.
 
+Next morning... dreamt about this last night. Here's the plan.
+For Block child classes (File, String, anything with random access that allows seek) we will NOT buffer in the IO class. The buffering can happen in the Enumerable. For Stream child classes (Pipe, Socket) we will use #read (not #pread) and buffer in the IO class. The Enumerable will not do buffering.
+
+When Transcoder wraps one of these IO classes, it can check `is_a?` and decide which Enumerable to load... Enumerable::Block or Enumerable::Stream.
+
+Also had some random thoughts about #read/#pread in the Transcoder wrapper, but they are fuzzy now... not sure what I was thinking there. Oh! To make Enumerable simpler, push the buffering logic into the #read/#pread of the Transcoder class. This way the Enumerable just resets its offset to whatever and the next read should satisfy as much as possible out of the buffer, if any. Need to be clever to make this caching work for #pread so we'll need to track `offset` internally to that method.
+
+In Enumerable::Block#read, we'll make sure that it always allocates its own buffer. #read_from_storage will pass nil for buffer:. Anyway, the #read/#pread should allocate a large reusable buffer (32k?) starting from the offset requested. It will only return the requests nbytes though and hang on to the rest. Next time a read request comes in, it will check to see if it overlaps the existing buffer. If so, satisfy it directly from the buffer otherwise satisfy as much as possible from buffer and then read another 32k.
+
+In Enumerable::Stram#read, this will just delegate directly to @io.read.
+
 ## SyncIO::Config
 
 API for creating configuration objects used to open new IO streams. A file can be specified by either a path or a file descriptor (but not both). Similarly, files can be opened in different modes and with different flags. Rather than try to design a method to handle all of these different combinations (with its attendant complex method signature) we provide a configuration object facility which enforces the appropriate rules.
