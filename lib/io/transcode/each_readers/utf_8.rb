@@ -6,6 +6,7 @@ class IO
         def initialize(**kwargs)
           super
           @encoding = Encoding::UTF_8
+          @separator = @separator ? @separator.force_encoding(Encoding::ASCII_8BIT) : nil
           @debug = false
         end
 
@@ -159,7 +160,7 @@ class IO
                 total_read = string.bytesize
                 offset += total_read
 
-                yield(total_read, errno, string, offset)
+                yield(total_read, errno, string.force_encoding(@encoding), offset)
 
                 string = String.new # reset!
               else
@@ -170,7 +171,7 @@ class IO
             elsif rc == 0
               # if we get here then we read to EOF and will return
               # the remainder of file; might also return empty string
-              yield(string.bytesize, nil, string, offset + string.bytesize)
+              yield(string.bytesize, nil, string.force_encoding(@encoding), offset + string.bytesize)
             else
               # error!
               yield(rc, errno, nil, offset)
@@ -192,21 +193,21 @@ class IO
                 total_read = string.bytesize
                 offset += total_read
 
-                yield(total_read, errno, string, offset)
+                yield(total_read, errno, string.force_encoding(@encoding), offset)
 
                 string = String.new # reset!
               else
                 # did not find separator, yield +limit+-sized string
                 offset += rc
 
-                yield(rc, errno, buffer, offset)
+                yield(rc, errno, buffer.force_encoding(@encoding), offset)
 
                 string = String.new # reset!
               end
             elsif rc == 0
               # if we get here then we read to EOF and will return
               # the remainder of file; might also return empty string
-              yield(string.bytesize, nil, string, offset + string.bytesize)
+              yield(string.bytesize, nil, string.force_encoding(@encoding), offset + string.bytesize)
             else
               # error!
               yield(rc, errno, nil, offset)

@@ -12,20 +12,28 @@ io = IO::Sync::File.open(
 
 tio = IO::Transcode.choose_for(encoding: Encoding::UTF_8, io: io)
 
-tio.each(separator: ': ') do |rc, errno, str, new_offset|
+sep = "\xC2\xB5"
+tio.each(separator: sep) do |rc, errno, str, new_offset|
   raise "read error, rc [#{rc}], errno [#{errno}]" if rc < 0
 
-  puts str.inspect, str.encoding
+  puts str.inspect, str.size, str.bytesize, str.encoding
   puts "string bytes [#{str.bytesize}], bytes read [#{rc}]"
 end
 
 puts '----------------------------------------'
 
-
 tio.each(limit: 50, separator: nil) do |rc, errno, str, new_offset|
   raise "read error, rc [#{rc}], errno [#{errno}]" if rc < 0
 
-  puts str.inspect, str.encoding
+  puts str.inspect, str.size, str.bytesize, str.encoding
+end
+
+puts '----------------------------------------'
+
+tio.each(limit: 50, separator: sep) do |rc, errno, str, new_offset|
+  raise "read error, rc [#{rc}], errno [#{errno}]" if rc < 0
+
+  puts str.inspect, str.size, str.bytesize, str.encoding
 end
 
 puts "io.close => #{io.close.inspect}"

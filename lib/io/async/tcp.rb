@@ -113,9 +113,18 @@ class IO
       end
 
       def connect(addr:, timeout: nil)
-        safe_delegation do |context|
+        rc, errno = safe_delegation do |context|
           rc, errno, behavior = context.connect(addr: addr, timeout: timeout)
           update_context(behavior)
+          [rc, errno]
+        end
+        if block_given?
+          begin
+            yield(self, rc, errno)
+          ensure
+            close
+          end
+        else
           [rc, errno]
         end
       end
@@ -128,16 +137,34 @@ class IO
       end
 
       def accept(timeout: nil)
-        rc, errno, address, socket = safe_delegation do |context|
-          rc, errno, address, socket = context.accept(timeout: timeout)
-          [rc, errno, address, socket]
+        if block_given?
+          # when #accept gets a block, loop forever accepting connections
+          # TODO: need a way to allow this loop to exit gracefully
+          while true
+            begin
+              rc, errno, address, socket = safe_delegation do |context|
+                rc, errno, address, socket = context.accept(timeout: timeout)
+                [rc, errno, address, socket]
+              end
+
+              yield(address, socket, rc, errno)
+            ensure
+              #socket.close
+            end
+          end
+        else
+          rc, errno, address, socket = safe_delegation do |context|
+            rc, errno, address, socket = context.accept(timeout: timeout)
+            [rc, errno, address, socket]
+          end
+
+          [address, socket, rc, errno]
         end
-        block_given? ? yield(address, socket, rc, errno) : [address, socket, rc, errno]
       end
 
-      def ssend(buffer:, flags:, timeout: nil)
+      def ssend(buffer:, nbytes:, flags:, timeout: nil)
         safe_delegation do |context|
-          rc, errno = context.ssend(buffer: buffer, flags: flags, timeout: timeout)
+          rc, errno = context.ssend(buffer: buffer, nbytes: nbytes, flags: flags, timeout: timeout)
           [rc, errno]
         end
       end
@@ -156,10 +183,10 @@ class IO
         end
       end
 
-      def recv(buffer:, flags:, timeout: nil)
+      def recv(buffer:, nbytes:, flags:, timeout: nil)
         safe_delegation do |context|
-          rc, errno = context.recv(buffer: buffer, flags: flags, timeout: timeout)
-          [rc, errno]
+          rc, errno, string = context.recv(buffer: buffer, nbytes: nbytes, flags: flags, timeout: timeout)
+          [rc, errno, string]
         end
       end
 

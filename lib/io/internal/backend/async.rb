@@ -118,18 +118,18 @@ class IO
             end
           end
 
-          def ssend(fd:, buffer:, flags:, timeout:)
+          def ssend(fd:, buffer:, nbytes:, flags:, timeout:)
             build_poll_write_request(fd: fd, repeat: false) do |fiber|
               build_command(fiber) do
-                Platforms::Functions.ssend(fd, buffer, buffer.size, flags.to_i)
+                Platforms::Functions.ssend(fd, buffer, nbytes, flags.to_i)
               end
             end
           end
 
-          def recv(fd:, buffer:, flags:, timeout:)
+          def recv(fd:, buffer:, nbytes:, flags:, timeout:)
             build_poll_read_request(fd: fd, repeat: false) do |fiber|
               build_command(fiber) do
-                Platforms::Functions.recv(fd, buffer, buffer.size, flags.to_i)
+                Platforms::Functions.recv(fd, buffer, nbytes, flags.to_i)
               end
             end
           end
