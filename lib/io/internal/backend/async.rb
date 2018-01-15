@@ -22,11 +22,18 @@ class IO
           end
 
           def close(fd:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.close(fd)
-              end
-            end
+            request = IO::Async::Private::Request::Close.new(
+              Fiber.current,
+              fd: fd,
+              timeout: timeout
+            )
+            reply = enqueue(request)
+
+            #            build_blocking_request do |fiber|
+            #              build_command(fiber) do
+            #                Platforms::Functions.close(fd)
+            #              end
+            #            end
           end
 
           def read(fd:, buffer:, nbytes:, timeout:)
@@ -193,7 +200,22 @@ class IO
 
           def enqueue(request)
             request.sequence_no = next_sequence_number
-            Thread.current.local[:_scheduler_].enqueue(request)
+            reply = Thread.current.local[:_scheduler_].schedule_request(request)
+
+            while true
+              if reply.nil?
+                Logger.debug(klass: self.class, name: :enqueue, message: "[#{tid}], reply was nil, reschedule fiber")
+                reply = Thread.current.local[:_scheduler_].reschedule_me
+              end
+              if reply
+                Logger.debug(klass: self.class, name: :enqueue, message: "[#{tid}], good reply")
+                break
+              else
+                Logger.debug(klass: self.class, name: :enqueue, message: "[#{tid}], reply was nil AGAIN, reschedule fiber")
+              end
+            end
+            raise "#{tid}, #{self.class}#schedule_request, reply is wrong! [#{fid}], #{reply.inspect}" unless reply
+            reply
           end
 
           def next_sequence_number
