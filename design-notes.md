@@ -708,7 +708,6 @@ OSX has kqueue. Linux has epoll. Both have #writev, #readv, and a bunch of other
 
 This would allow us to provide support for platform-specific functions at runtime. I'm sure there's more than one way to skin this cat, so play around with a few options.
 
-
 ## SyncIO::Config
 
 API for creating configuration objects used to open new IO streams. A file can be specified by either a path or a file descriptor (but not both). Similarly, files can be opened in different modes and with different flags. Rather than try to design a method to handle all of these different combinations (with its attendant complex method signature) we provide a configuration object facility which enforces the appropriate rules.
