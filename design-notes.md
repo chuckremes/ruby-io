@@ -852,3 +852,95 @@ end
 These need to be cheap and fast to allocate and populate. Structs might be a good choice though I wish they supported keyword args pre-2.5.0. 
 
 All I know is that the more I experience passing `rc, errno, string, offset` or similar long sets of arguments back through a method or into a block, the more I'm convinced these need to collapse into objects. It also future-proofs the method by allowing fields to be added without worrying about positional issues in the block's yield, etc.
+
+
+Reinstate the debug logging in the scheduler
+make note of the fiber that exits the block from connect... where did it last get transferred into from? try to figure out where its exit is supposed to match to
+consider no transferring into the connect fiber from that method; instead, call the usual enqueue method. this way we centralize all error handling for nils and such
+also, per above, we can enqueue the fiber, detect that and add it to runnables, and then the fiber_io scheduler can transfer to it when there is time for it to run. again, centralize transfers.
+
+tracked the lifecycle of the "connect block fiber" and its parent before crash.
+4820
+0560
+2420
+5380
+4880
+8480
+2740
+
+0240's last transfer is in enqueue to the iofiber loop
+it's first child fiber, 4820, was originally transferred to after the
+connect block.
+
+4820 into iofiber, enqueue
+iofiber delivers to 4820, enqueue
+4820 into iofiber, enqueue
+iofiber delivers to 4820, enqueue
+4820 into iofber, enqueue
+iofiber to 4820, enqueue
+4820 block has finished
+4820 closes socket
+4820 into iofiber, enqueue
+0240 is transferred from eligible_fibers into connect, value is nil
+0240 into iofiber, enqueue (waiting for response to next #connect)
+iofiber delivers to 4820, enqueue (result of close)
+4820 is exiting...
+4820 is done, see where next fiber picks up
+
+0240 picks up after enqueue, val is NIL but was expecting reply for #connect
+
+So the issue is that when we pass a block to async #connect, we enclose that block in its own fiber and transfer to it directly. Why? The idea was that the block would execute immediately and quickly run into either an async call or the block would finish and exit. Prior to transferring to this fiber to execute the block, we mark the "parent" fiber as :can_work which is a hint to the Fiber Scheduler. 
+
+Anyway, the block runs an async request and enters the iofiber loop. The request is posted to the IOLoop. We then check for eligible fibers to run. The "connect parent" fiber marked itself as :can_work so we transfer back to it from the fiber loop. This let's the connect fiber continue executing. In this case, it loops back and runs another connect request complete with a block and therefore yet another new child fiber.
+
+This pretty much keeps going with a few async replies coming back to their respective fibers and being processed correctly. The replies contain the originating fiber, so we look it up and transfer the reply to the fiber. This works great.
+
+The problem we need to solve is when any of the "connect child fibers" exit. When their block is done, the fiber has nothing more to do so it exits. The way Fiber#transfer works is that we will transfer back to the originator (parent) of that child fiber no matter where it is (uh oh, what happens if the parent has already exited? guess is that ITS parent will be transferred to).
+
+In this case the parent fiber has just enqueued another asyn connect request and was waiting on a reply. Instead, its child fiber exited and returned nil as the fiber value. This immediately transferred back into the parent fiber. It was expecting a connect-reply but got nil. Kaboom.
+
+So how to fix?
+
+One thought is to have the parent fiber enqueue its child fiber to the iofiber loop. Let the iofiber loop add it to a list of "eligible"/runnable fibers and kick it off when ready. We'd want to transfer back to the parent fiber asap but this time it's expecting a nil reply.
+
+When the iofiber loop checks for runnables, it could kick off this fiber. That way, when the fiber exits the iofiber loop is now considered the "parent" since it handled the original transfer and the exiting fiber will transfer back into the iofiber loop.
+
+We should probably have a separate method on the Scheduler for accepting these fibers. e.g.
+  Thread.current.local[:_scheduler_].schedule_fibers(originator: fiber1, detached: fiber2)
+  
+Then change the current entry to:
+  Thread.current.local[:_scheduler_].schedule_request(request)
+
+Internally, both will call #enqueue which handles the transfer. But each method can add its own "type checks" to verify the passed values and the return values are as expected.
+
+So #schedule_fiber needs to take two args (which complicates the call to #enqueue) or a new Request object that encapsulates the child fiber and its parent. Because we want to transfer back to the parent immediately after handing off the child fiber.
+
+We really need to collapse the number of iofiber entry and exit points to one location. This let's us centralize error handling and reason about this coroutine madness a bit better. As of now, the entry point is always via #enqueue. The exit point is via #deliver or from the #run_eligible_fibers loop. That's bad because every exit locale is just another entry location for a fiber transferring to iofiber. To consolidate this to one place, we'll need to change our perspective to see the solution.
+
+Before this notion of eligible fibers came about, we just had to worry about taking in a request, posting it to the IOLoop, waiting on a response from the IOLoop, and then passing that reply back to the appropriate fiber. There was a LOT of sleeping going on here. And we knew that there was a 1:1 match between requests and replies (the Promises mechanism enforced this even when timeouts came into play since only one producer can ever fulfill a Promise... late comers are ignored).
+
+Let's change out view of things from request/reply to runnable only. If a request comes in, it is NOT runnable. We need to post it to the IOLoop. A reply/response IS runnable. Add it to the runnable queue. A fiber handed off from outside to the iofiber loop is runnable. Add it to runnables.
+
+I'm thinking we need a multi-level feedback queue. Replies are highest priority (1). Requests are important but they aren't part of runnables; they are sent to the IOLoop to be transformed into replies. So we'll leave priority 2 open. And lastly, we have fibers handed off to the fiber loop to be run. They are the lowest priority at priority 3. Add them all to the runnable multi-level feedback queue. To prevent starvation of the lower priority items, we'll say that every N pop events from that queue should automatically promote every surviving element by one level. That is, priority3 stuff is promoted to priority2. Priority2 stuff is promoted to priority1. Priority1 is already at highest priority so it's handled FIFO. Items should be sorted by time posted, so an older priority2 item promoted to priority1 should be in FRONT of a priority1 item that was newer but already there. This is harder but fairer. This would be an easy class to write. We don't need this special kind of queue right away... simple array is fine for now.
+
+By centralizing all runnables to a single queue, we'll have a single place from which to transfer to the outside. I'd like to be able to count on any fiber that exits to immediately transfer back here, so this centralization makes that a definite possibility. 
+
+So we'll have one ingress to iofiber via 2 portals... #schedule_fiber, and #schedule_request. They'll both funnel in through #enqueue but have separate error handling, checking, etc. Inside the iofiber, we'll take requests, replies, and fibers from the outside (fibers in same thread or replies from IOLoop). The requests will be immediately posted to the IOLoop, so no transfer takes place with them or needs to be accounted for. Fibers and replies will all funnel into the queue. We'll pop from the queue and transfer either the reply back to its requestor OR we'll spin up a fiber that needs to start some work or CONTINUE some work. When any fiber exits, they will immediately transfer back here and we'll detect it via a nil. Perhaps we should institute a standard wherein internal fibers should exit with a symbol like :exit so we can easily capture it. User fibers that are scheduled might return anything, so unless it's a Reply/Response (need a class for it) or a Fiber, just throw it out.
+
+When there are no runnables, we block on the mailbox waiting for an IOLoop reply.
+
+Time to code.
+
+The above idea *almost* worked. Got it coded up and it looks great. However, the behavior of an exiting fiber is different that I expected. Instead of exiting back to where it was first resumed/transferred, it exits back to the fiber where it was defined.
+
+To fix, I'm going to try passing in the #connect block to the iofiber as a runnable. When it pops that runnable off the queue, it will detect that it's a block, wrap it in a fiber, and transfer to it. Let's see if that fixes the exit issue.
+
+So I was wrong about the problem above and the fix. Turns out that the fiber exiting will NOT bounce back to where it was defined. It just returns to the last place in the thread that called Fiber#transfer. In this situation it's almost always a non-iofiber fiber that has just enqueued a request. So we return from the block (and fiber) and we transfer right to where an outside fiber called #schedule_request. Sigh.
+
+Not sure what to do. First thought is that we detect the nil reply and immediately transfer back to the iofiber to block waiting on a genuine reply. So, I'd need to define yet another method like #reschedule_me which would call #enqueue(nil). Internally we would detect the nil coming in and ignore it. Just process the next runnable. If none, block on the mailbox waiting for a reply.
+
+So now I see an issue where a thread is ready to exit but its children fibers still have work to do. When the thread exits, the whole runtime aborts. I think we'll need to make that thread hang around until its fibers have completed. The complicating factor here is, of course, that the thread couldn't exit unless some fiber transferred to the root fiber which then exited. Hmmm, need to investigate this some more.
+
+I think finalizers are a good place to start. The finalizer should clean up any open FDs and tell the Scheduler loop to exit. When closing FDs, that request needs to filter down to the IOLoop Poller too so those FDs can be deregistered. The Scheduler loop should probaby post a message to IOLoop letting it know it should deregister the soon-to-be-dead thread's mailbox also. Try that and see where we get.
+
+Second, the echo example could use a little explicit help in cleanup while we figure out how to automate all of it. Make temporary changes to relieve crashes.
