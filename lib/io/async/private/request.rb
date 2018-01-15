@@ -9,7 +9,7 @@ class IO
         # a block, so there's a possibility that this could be a minor
         # performance enhancement. Preliminary tests show now improvement
         # but we'll keep around this example for a later revisit.
-        class PRead
+        class BaseBlocking
           attr_accessor :sequence_no
           attr_reader :fiber
           def initialize(fiber, **kwargs)
@@ -27,17 +27,38 @@ class IO
             @promise = Promise.new(mailbox: @mailbox)
           end
 
-          def call
-            execute do |fd, buffer, nbytes, offset, timeout|
-              Platforms::Functions.pread(fd, buffer, nbytes, offset)
-            end
-          end
-
           def execute
             results = yield(@kwargs.values)
 
             results[:fiber] = @fiber
             @promise.fulfill(results)
+          end
+
+          def selector_update(poller:)
+            # no op by default
+          end
+        end
+
+        class PRead < BaseBlocking
+          def call
+            execute do |fd, buffer, nbytes, offset, timeout|
+              Platforms::Functions.pread(fd, buffer, nbytes, offset)
+            end
+          end
+        end
+
+        class Close < BaseBlocking
+          def call
+            execute do |fd, timeout|
+              Platforms::Functions.close(fd)
+            end
+          end
+
+          def selector_update(poller:)
+            super
+
+            # tell, don't ask
+            poller.deregister(fd: @kwargs[:fd])
           end
         end
 
@@ -69,6 +90,10 @@ class IO
           def call
             @command.call
           end
+
+          def selector_update(poller:)
+            # no op by default
+          end
         end
 
         class BlockingCommand < Command
@@ -85,14 +110,18 @@ class IO
         end
 
         class NonblockingReadCommand < NonblockingCommand
-          def register(poller:)
+          def selector_update(poller:)
+            super
+
             # tell, don't ask
             poller.register_read(fd: @fd, request: @command)
           end
         end
 
         class NonblockingWriteCommand < NonblockingCommand
-          def register(poller:)
+          def selector_update(poller:)
+            super
+
             poller.register_write(fd: @fd, request: @command)
           end
         end
@@ -104,7 +133,9 @@ class IO
             super(fiber: fiber, fd: nil, &blk)
           end
 
-          def register(poller:)
+          def selector_update(poller:)
+            super
+
             poller.register_timer(duration: @duration, request: @command)
           end
         end
@@ -128,6 +159,16 @@ class IO
         #
         module System
           Register = Struct.new(:fiber_id, :outbox)
+          Deregister = Struct.new(:fiber_id)
+        end
+
+        class Fibers
+          attr_reader :originator, :spawned
+
+          def initialize(originator:, spawned:)
+            @originator = originator
+            @spawned = spawned
+          end
         end
       end
     end

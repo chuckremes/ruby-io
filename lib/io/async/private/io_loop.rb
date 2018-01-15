@@ -33,17 +33,23 @@ class IO
 
         def register(fiber:, outbox:)
           Logger.debug(klass: self.class, name: :register, message: 'registering fiber')
-          command = Request::System::Register.new(fiber, outbox)
+          command = Request::System::Register.new(fiber.object_id, outbox)
           request = Request::Req.new(fiber, fiber.object_id, nil, nil, command)
           Logger.debug(klass: self.class, name: :register, message: 'posting request')
+          @system_inbox.post request
+        end
+
+        def deregister(fiber:)
+          Logger.debug(klass: self.class, name: :deregister, message: "deregistering fiber [#{fid}]")
+          command = Request::System::Deregister.new(fiber.object_id)
+          request = Request::Req.new(fiber, fiber.object_id, nil, nil, command)
+          Logger.debug(klass: self.class, name: :deregister, message: 'posting request')
           @system_inbox.post request
         end
 
         def io_loop
           Logger.debug(klass: self.class, name: :io_loop, message: 'entering infinite loop')
           loop do
-            #           Logger.debug(klass: self.class, name: :io_loop, message: 'looping')
-
             process_system_messages
             process_command_messages
           end
@@ -53,21 +59,21 @@ class IO
         # IOLoop are handled here.
         def process_system_messages
           request = @system_inbox.pickup
-          #          Logger.debug(klass: self.class, name: :process_system_messages, message: (request ? request.inspect : 'no request'))
           return unless request
 
           Logger.debug(klass: self.class, name: :process_system_messages, message: 'got a valid request, working...')
-          Logger.debug(klass: self.class, name: :PRO, message: "request.command.is_a? [#{request.command.is_a?(Request::System::Register)}]")
           if request.command.is_a?(Request::System::Register)
             Logger.debug(klass: self.class, name: :process_system_messages, message: 'matched')
             # Note we are assigning the fiber's outbox to inbox. From
-            #this IOLoop's perspective, this is correct.
+            # this IOLoop's perspective, this is correct.
             command = request.command
-            Logger.debug(klass: self.class, name: :process_system_messages, message: 'got command')
             fiber_id, inbox = command.fiber_id, command.outbox
-            Logger.debug(klass: self.class, name: :process_system_messages, message: 'pulled out args')
             @incoming[fiber_id] = inbox
             Logger.debug(klass: self.class, name: :process_system_messages, message: 'completed registration')
+          elsif request.command.is_a?(Request::System::Deregister)
+            fiber_id = request.command.fiber_id
+            @incoming.delete(fiber_id)
+            Logger.debug(klass: self.class, name: :process_system_messages, message: "completed deregistration, [#{fiber_id}]")
           else
             Logger.debug(klass: self.class, name: :process_system_messages, message: 'unknown system message')
             raise "Unknown system message! [#{request.class}]"
@@ -85,14 +91,18 @@ class IO
 
           @incoming.values.each do |mailbox|
             request = mailbox.pickup
-            #Logger.debug(klass: self.class, name: :process_command_messages, message: (request ? request.inspect : 'no request'))
-            next unless request
+            next unless request # a non-blocking read from an empty queue returns nil
+
+            Logger.debug(klass: self.class, name: :process_command_messages, message: "request #{request.inspect}")
 
             if request.blocking?
               dispatch_to_workers(request)
             else
               # Only process up to +max_allowed+ requests for immediate dispatch
-              break if immediate_count >= @poller.max_allowed
+              if immediate_count > @poller.max_allowed
+                Logger.debug(klass: self.class, name: :process_command_messages, message: "immediate_count [#{immediate_count}] exceeded max!")
+                break
+              end
               immediate_count += 1
               immediate_dispatch(request)
             end
@@ -101,15 +111,15 @@ class IO
         end
 
         def dispatch_to_workers(request)
+          request.selector_update(poller: @poller)
           @pool.dispatch(request)
         end
 
         def immediate_dispatch(request)
-          # no op for now...
           # register with event loop
           # probably need to save a reference to this request somewhere. index by
           # FD and sequence_no maybe?
-          request.register(poller: @poller)
+          request.selector_update(poller: @poller)
         end
 
         def flush_immediate

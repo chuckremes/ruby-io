@@ -12,6 +12,7 @@ class IO
       NO_TIMEOUT = TimeSpecStruct.new
       SHORT_TIMEOUT = TimeSpecStruct.new.tap { |ts| ts[:tv_sec] = 1 }
       SELF_PIPE_READ_SIZE = 20
+      EMPTY_CALLBACK = Proc.new { nil }
 
       def initialize(self_pipe:)
         @kq_fd = Platforms.kqueue
@@ -36,6 +37,12 @@ class IO
 
       def max_allowed
         MAX_EVENTS
+      end
+
+      # Called to remove the +fd+ from the poller and delete any callbacks
+      def deregister(fd:)
+        delete_from_selector(fd: fd)
+        delete_callbacks(fd: fd)
       end
 
       def register_timer(duration:, request:)
@@ -92,7 +99,9 @@ class IO
       private
 
       def process_event(event:)
-        if event.filter == Constants::EVFILT_READ
+        if error?(event)
+          process_error(event: event)
+        elsif event.filter == Constants::EVFILT_READ
           process_read_event(event: event)
         elsif event.filter == Constants::EVFILT_WRITE
           process_write_event(event: event)
@@ -101,6 +110,10 @@ class IO
         else
           raise "Fatal: unknown event flag [#{event.flags}]"
         end
+      end
+
+      def process_error(event:)
+        Logger.debug(klass: self.class, name: :process_error, message: "event #{event.inspect}")
       end
 
       def process_read_event(event:)
@@ -169,6 +182,36 @@ class IO
         @self_pipe = self_pipe
         @self_pipe_buffer = ::FFI::MemoryPointer.new(:int, SELF_PIPE_READ_SIZE)
         register_read(fd: @self_pipe, request: :self_pipe)
+      end
+
+      # Due to the vagaries of the blocking +close+ function being called by the worker
+      # pool, the +fd+ might already be deleted from the kqueue. If it is already gone,
+      # then we'll get an EV_ERROR on the next poll. If it's not gone, this will clean
+      # it up.
+      def delete_from_selector(fd:)
+        register(
+          fd: fd,
+          request: nil,
+          filter: Constants::EVFILT_READ,
+          flags: Constants::EV_DELETE
+        )
+
+        register(
+          fd: fd,
+          request: nil,
+          filter: Constants::EVFILT_WRITE,
+          flags: Constants::EV_DELETE
+        )
+        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleting, fd [#{fd}]")
+      end
+
+      def delete_callbacks(fd:)
+        @read_callbacks[fd] = EMPTY_CALLBACK if @read_callbacks.key?(fd)
+        @write_callbacks[fd] = EMPTY_CALLBACK if @write_callbacks.key?(fd)
+      end
+
+      def error?(event)
+        (event.flags & Constants::EV_ERROR) > 0
       end
     end
 
