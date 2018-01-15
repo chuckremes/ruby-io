@@ -6,7 +6,7 @@ class IO
     # right again by adding a #local instance method. This returns a hash
     # intended for storing whatever we need using the usual hash methods.
     class Thread < ::Thread
-      include LocalMixin
+      include ThreadLocalMixin
     end
   end
 end

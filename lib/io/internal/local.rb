@@ -5,10 +5,14 @@ class IO
     # This is a storage mechanism to replace the standard mechanism.
     #
     class Local
-      def initialize
+      def initialize(klass)
         @storage = {}
-        @thread_creator = Thread.current
-        @fiber_creator = Fiber.current
+        @klass = klass
+        @creator = if Fiber == klass || Thread == klass
+          klass.current
+        else
+          raise "Cannot allocate local storage for class type [#{klass}]"
+        end
       end
 
       def [](key)
@@ -34,8 +38,9 @@ class IO
       private
 
       def ownership_check
-        return if @thread_creator == Thread.current && @fiber_creator == Fiber.current
-        raise ThreadError, "Modification to local storage disallowed from non-originating thread or fiber!"
+        return if @creator == @klass.current
+        raise ThreadError, "Access to local storage disallowed from non-originating thread or fiber!" +
+        " Expected [#{@creator.object_id}] but got #{@klass}.current [#{@klass.current.object_id}]."
       end
     end
 
@@ -43,17 +48,23 @@ class IO
     # support the Async functionality.
     class FiberLocal < Local
       def initialize
-        super
+        super(Fiber)
         @storage[:sequence_no] = -1
+      end
+    end
+
+    class ThreadLocal < Local
+      def initialize
+        super(Thread)
       end
     end
 
     # Done as a module so we can easily add it to a running Thread or Fiber via #extend.
     # e.g. add this to root Thread via Thread.main.extend(LocalMixin)
     #
-    module LocalMixin
+    module ThreadLocalMixin
       def local
-        @local ||= Local.new
+        @local ||= ThreadLocal.new
       end
     end
 

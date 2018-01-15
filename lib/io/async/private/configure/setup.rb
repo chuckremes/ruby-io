@@ -12,7 +12,7 @@ class IO
 
           def thread_extension
             return if Thread.current.respond_to?(:local)
-            Thread.current.extend(Internal::LocalMixin)
+            Thread.current.extend(Internal::ThreadLocalMixin)
             raise "extension failed" unless Thread.current.respond_to?(:local)
           end
 
