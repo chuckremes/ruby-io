@@ -119,11 +119,20 @@ class IO
           [rc, errno]
         end
         if block_given?
-          begin
-            yield(self, rc, errno)
-          ensure
-            close
+          io = self
+          block = Proc.new do
+            begin
+              yield(io, rc, errno)
+            ensure
+              close
+            end
           end
+
+          # mark current fiber as ready to do more work
+          value = Thread.current.local[:_scheduler_].schedule_fibers(originator: Fiber.current, spawned: block)
+
+          # when transferred back to this fiber, +value+ should be nil
+          raise "transferred back to #connect fiber, but came with non-nil info [#{value.inspect}]" if value
         else
           [rc, errno]
         end
@@ -149,7 +158,7 @@ class IO
 
               yield(address, socket, rc, errno)
             ensure
-              #socket.close
+              socket.close if socket.respond_to?(:close)
             end
           end
         else
