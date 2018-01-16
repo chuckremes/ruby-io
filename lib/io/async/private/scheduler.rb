@@ -174,6 +174,7 @@ class IO
           Logger.debug(klass: self.class, name: :process_replies, message: 'waiting for reply from inbox')
           reply = @inbox.pickup(nonblocking: false)
 
+          raise 'Unexpectedly received a nil reply from IOLoop!' unless reply
           Logger.debug(klass: self.class, name: :process_replies, message: "[#{tid}], got reply to deliver, #{reply.inspect}")
           add_runnable(Response::Wrapper.new(reply))
         end
