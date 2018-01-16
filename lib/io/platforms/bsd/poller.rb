@@ -56,7 +56,7 @@ class IO
           data: duration,
           udata: timer.object_id
         )
-        Logger.debug(klass: self.class, name: 'kqueue poller', message: "registered for timer, object_id [#{request.object_id}]")
+        Logger.debug(klass: self.class, name: 'kqueue poller', message: "registered for timer duration [#{duration}], object_id [#{request.object_id}]")
       end
 
       def register_read(fd:, request:)
@@ -117,14 +117,17 @@ class IO
       end
 
       def process_read_event(event:)
+        Logger.debug(klass: self.class, name: :process_read_event, message: '')
         execute_callback(event: event, identity: event.ident, callbacks: @read_callbacks, kind: 'READ')
       end
 
       def process_write_event(event:)
+        Logger.debug(klass: self.class, name: :process_write_event, message: '')
         execute_callback(event: event, identity: event.ident, callbacks: @write_callbacks, kind: 'WRITE')
       end
 
       def process_timer_event(event:)
+        Logger.debug(klass: self.class, name: :process_timer_event, message: '')
         @timers.fire_expired
       end
 
