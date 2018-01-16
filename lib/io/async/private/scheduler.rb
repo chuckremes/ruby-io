@@ -62,7 +62,7 @@ class IO
 
         # Pass the request to the IO Fiber for processing next.
         def enqueue(request)
-          @io_fiber.transfer(request)
+          @io_fiber.transfer(request) if @io_fiber.alive?
         end
 
         def complete_setup
@@ -92,6 +92,7 @@ class IO
         # is submitted to the IO Thread and then we wait for a reply.
         def io_fiber_loop(calling_fiber)
           request = calling_fiber.transfer
+          setup_thread
           post(request)
 
           begin
@@ -149,6 +150,7 @@ class IO
             # return value of an exited fiber.
             Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], from [#{fid}] to [#{fiber.fid}]")
             object = fiber.transfer(argument)
+            setup_thread
             Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], into [#{fid}]")
 
             if object.is_a?(Request::Command) || object.is_a?(Request::BaseBlocking)
@@ -197,6 +199,16 @@ class IO
             block.call
             Logger.debug(klass: self.class, name: :make_runnable_from_proc, message: "[#{tid}], fiber exiting, see where we transfer to")
           end
+        end
+
+        if RUBY_PLATFORM =~ /java/
+          # JRuby uses a thread pool for Fibers, so a Fiber may run on many different threads
+          # over the course of its life. We need to add our extensions if they are missing.
+          def setup_thread
+            Thread.current.extend(Internal::ThreadLocalMixin) unless Thread.current.respond_to?(:local)
+          end
+        else
+          def setup_thread(); end
         end
       end
     end
