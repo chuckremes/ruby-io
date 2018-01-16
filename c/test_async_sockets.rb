@@ -24,7 +24,7 @@ server_thr = Thread.new do
       p socket
       puts "SERVER: sending response"
       buffer.write_string('response back to client.')
-      rc, errno = socket.ssend(buffer: buffer, flags: 0)
+      rc, errno = socket.ssend(buffer: buffer, nbytes: buffer.size, flags: 0)
       puts "SERVER: recv: rc [#{rc}], errno [#{errno}]"
       puts "Server: closing socket"
       socket.close
@@ -47,7 +47,7 @@ client_thr = Thread.new do
   buffer = ::FFI::MemoryPointer.new(:char, 500)
   buffer.write_string('request from client to server.')
   puts "CLIENT: about to send some data, [#{buffer.read_string}]"
-  rc, errno = client.ssend(buffer: buffer, flags: 0)
+  rc, errno = client.ssend(buffer: buffer, nbytes: buffer.size, flags: 0)
   puts "CLIENT: send: rc [#{rc}], errno [#{errno}]"
   rc, errno = client.recv(nbytes: buffer.size, buffer: buffer, flags: 0)
   puts "CLIENT: recv: rc [#{rc}], errno [#{errno}], string [#{buffer.read_string}]"
