@@ -87,6 +87,7 @@ class IO
       def initialize(fd:, state: :open, error_policy: nil)
         @creator = Thread.current
         reply = FCNTL.set_nonblocking(fd: fd) # ignore return code?
+        @accept_loop = nil
 
         @context = if :open == state
           Internal::States::TCP::Open.new(fd: fd, backend: Internal::Backend::Async, parent: self)
@@ -146,21 +147,33 @@ class IO
       end
 
       def accept(timeout: nil)
-        if block_given?
+        if block_given? && @accept_loop.nil?
+          @accept_loop = true
           # when #accept gets a block, loop forever accepting connections
-          # TODO: need a way to allow this loop to exit gracefully
-          while true
+          # this won't work until I get +timeout+ hooked up and functional.
+          while @accept_loop
             begin
               rc, errno, address, socket = safe_delegation do |context|
                 rc, errno, address, socket = context.accept(timeout: timeout)
                 [rc, errno, address, socket]
               end
 
-              yield(address, socket, rc, errno)
-            ensure
-              socket.close if socket.respond_to?(:close)
+              block = Proc.new do
+                begin
+                  yield(address, socket, rc, errno)
+                ensure
+                  socket.close if socket.respond_to?(:close)
+                end
+              end
+
+              # Schedule block above to be run
+              value = Thread.current.local[:_scheduler_].schedule_fibers(originator: Fiber.current, spawned: block)
+
+              # when transferred back to this fiber, +value+ should be nil
+              raise "transferred back to #connect fiber, but came with non-nil info [#{value.inspect}]" if value
             end
           end
+          @accept_loop = nil
         else
           rc, errno, address, socket = safe_delegation do |context|
             rc, errno, address, socket = context.accept(timeout: timeout)
@@ -169,6 +182,10 @@ class IO
 
           [address, socket, rc, errno]
         end
+      end
+
+      def accept_break
+        @accept_loop = false
       end
 
       def ssend(buffer:, nbytes:, flags:, timeout: nil)
