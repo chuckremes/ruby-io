@@ -19,6 +19,7 @@ class IO
           @pipe_reader, @pipe_writer = self_pipe_trick_setup
           @poller = Internal::Backend::Async::Poller.new(self_pipe: @pipe_reader)
           @system_inbox = IOLoopMailbox.new(self_pipe: @pipe_writer)
+          @mutex = Mutex.new
 
           # Store the mailboxes from all registered Fiber Schedulers. Command
           # Requests come in via this mailbox. Note that replies are sent back
@@ -49,7 +50,7 @@ class IO
 
         def io_loop
           Logger.debug(klass: self.class, name: :io_loop, message: 'entering infinite loop')
-          loop do
+          while true
             process_system_messages
             process_command_messages
           end
@@ -68,11 +69,11 @@ class IO
             # this IOLoop's perspective, this is correct.
             command = request.command
             fiber_id, inbox = command.fiber_id, command.outbox
-            @incoming[fiber_id] = inbox
+            add_incoming(id: fiber_id, mailbox: inbox)
             Logger.debug(klass: self.class, name: :process_system_messages, message: 'completed registration')
           elsif request.command.is_a?(Request::System::Deregister)
             fiber_id = request.command.fiber_id
-            @incoming.delete(fiber_id)
+            delete_incoming(id: fiber_id)
             Logger.debug(klass: self.class, name: :process_system_messages, message: "completed deregistration, [#{fiber_id}]")
           else
             Logger.debug(klass: self.class, name: :process_system_messages, message: 'unknown system message')
@@ -89,7 +90,7 @@ class IO
         def process_command_messages
           immediate_count = 0
 
-          @incoming.values.each do |mailbox|
+          incoming_values.each do |mailbox|
             request = mailbox.pickup
             next unless request # a non-blocking read from an empty queue returns nil
 
@@ -155,6 +156,18 @@ class IO
 
         def self_pipe_writer
           @pipe_writer
+        end
+
+        def add_incoming(id:, mailbox:)
+          @mutex.synchronize { @incoming[id] = mailbox }
+        end
+
+        def delete_incoming(id:)
+          @mutex.synchronize { @incoming.delete(id) }
+        end
+
+        def incoming_values
+          values = @mutex.synchronize { @incoming.values.to_a }
         end
 
         IOLoop.current # make sure we allocate it during load step
