@@ -56,6 +56,7 @@ class IO
         # does nothing when fired.
         #
         def add_oneshot(delay:, callback:)
+          Logger.debug(klass: self.class, name: :add_oneshot, message: "delay: #{delay}, callback: #{callback}")
           return nil unless callback
 
           timer = Timer.new(timers: self, delay: delay, callback: callback)
@@ -85,8 +86,11 @@ class IO
           @last_fired = now
 
           # defer firing the timer until after this loop so we can clean it up first
-          @timers.dup.each do |timer|
+          # --
+          # Work around JRuby bug by converting set to array before dup'ing
+          @timers.to_a.dup.each do |timer|
             break unless timer.expired?(now)
+            Logger.debug(klass: self.class, name: :fire_expired, message: 'firing expired timer!')
             timer.fire
             cancel(timer)
           end
@@ -96,7 +100,8 @@ class IO
         # from Timers.now + whatever delay was originally recorded.
         #
         def reschedule
-          timers = @timers.dup
+          Logger.debug(klass: self.class, name: :reschedule, message: '')
+          timers = @timers.to_a.dup
           @timers.clear
 
           timers.each do |timer|
