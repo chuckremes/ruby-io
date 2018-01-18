@@ -943,3 +943,26 @@ So now I see an issue where a thread is ready to exit but its children fibers st
 I think finalizers are a good place to start. The finalizer should clean up any open FDs and tell the Scheduler loop to exit. When closing FDs, that request needs to filter down to the IOLoop Poller too so those FDs can be deregistered. The Scheduler loop should probaby post a message to IOLoop letting it know it should deregister the soon-to-be-dead thread's mailbox also. Try that and see where we get.
 
 Second, the echo example could use a little explicit help in cleanup while we figure out how to automate all of it. Make temporary changes to relieve crashes.
+
+ECHO PERFORMANCE
+Noticed that the echo example was not advancing as quickly as it should with a re-entrant fiber scheduler. After some investigation I think I have the issue pinpointed. I have been treating #connect as a blocking operation. It may take a while for it to complete. What I should have been doing was calling connect in the main thread/fiber and looking for EAGAIN/EWOULDBLOCK/EINPROGRESS. If I get that, then register the FD for a write event with the poller. When it is writable, then the next call should be to #getsockopt(sock, SOL_SOCKET, SO_ERROR, err, errlen) to see if it failed; if zero, note that the connection is up and good; if non-zero, report error to caller. See: https://cr.yp.to/docs/connect.html
+
+That got me to thinking about #read/#write too. Right now I always schedule those to happen on the IOLoop but that's probably taking the easy way out. What I should do is read/write until I get EAGAIN/similar. For a read, return any bytes that were partially read (#read semantics allow for short reads). Then on the next call if I get EAGAIN without any bytes having been read at all, schedule it with the Poller and for a callback. Do the same for #write. This means I'll actually get work done more quickly on my  main thread rather than ALWAYS shunting the work off to the IOLoop.
+
+When I make these updates, I'll see pretty quickly if performance has improved.
+
+Made the improvements. Still see a strange pause early on. What I expect is this:
+1. Should loop through all ClientCount connections in under 100ms or so.
+2. Should see replies come back from the server based upon its random sleep for each accepted connection.
+3. Reply round trip times should be ordered from quickest to slowest.
+
+What I see:
+1. All client connections take 5-10 seconds.
+2. Replies come back in the expected random order.
+3. Reply round trip times are NOT sorted from lowest to highest. Boo!
+
+I can't seem to reproduce the issues I mention above. MRI has some weird timing issues, but Rubinius and JRuby (native threads) don't exhibit the same issues. Perhaps there is no issue at all.
+
+TIMEOUTS
+I think I have timeouts figured out for async calls. When building the async command, I always pass the timeout arg. The command should build an Async::Timer. It can register itself via the #selector_update call when the command registers itself for a read/write update. It will piggyback on the +poller+ ref and register for a timer event. The Timer callback should include the *SAME* Promise as the read/write call. Whoever succeeds first, wins.
+
