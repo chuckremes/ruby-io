@@ -961,7 +961,7 @@ What I see:
 2. Replies come back in the expected random order.
 3. Reply round trip times are NOT sorted from lowest to highest. Boo!
 
-I can't seem to reproduce the issues I mention above. MRI has some weird timing issues, but Rubinius and JRuby (native threads) don't exhibit the same issues. Perhaps there is no issue at all.
+I can't seem to reproduce the issues I mention above. MRI has some weird timing issues, but Rubinius and JRuby (native threads) don't exhibit the same issues. Perhaps there is no issue at all. When I added some timing debugging, it looked like the call to #fcntl in the TCP initialize method had a long delay sometimes. I confirmed it is async. I'll keep digging if I notice this again.
 
 TIMEOUTS
 I think I have timeouts figured out for async calls. When building the async command, I always pass the timeout arg. The command should build an Async::Timer. It can register itself via the #selector_update call when the command registers itself for a read/write update. It will piggyback on the +poller+ ref and register for a timer event. The Timer callback should include the *SAME* Promise as the read/write call. Whoever succeeds first, wins.
