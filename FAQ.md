@@ -38,13 +38,13 @@
 
 5. Will this project support my ancient operating system and its possibly weird system calls?
 
-    A. Target is to support POSIX as a baseline. If the ancient system conforms to POSIX, then it will be supported. As a general rule of thumb, if the operating system is earlier than Linux kernel 4.1, OSX 10.12, Windows 10, FreeBSD 11, OpenBSD 6, or NetBSD 7 then support will be spotty. Patches to the core system to support older systems will likely not be accepted; instead, a `ruby-io-patches` project could be created to collect patches for older systems and loaded only when necessary. I do not intend to pollute the core library to support systems 10+ years old.
+    A. Target is to support POSIX-2008.1 as a baseline. If the ancient system conforms to POSIX, then it will be supported. As a general rule of thumb, if the operating system is earlier than Linux kernel 4.1, OSX 10.12, Windows 10, FreeBSD 11, OpenBSD 6, or NetBSD 7 then support will be spotty. Patches to the core system to support older systems will likely not be accepted; instead, a `ruby-io-patches` project could be created to collect patches for older systems and loaded only when necessary. I do not intend to pollute the core library to support systems 10+ years old.
 
 ### Design
 
 6. How does the non-blocking or asynchronous IO support work?
 
-    A. When the `Async` portion of the library is loaded, any call to its IO methods will setup the asynchronous infrastructure if it hasn't been started yet. The calling thread creates a new Fiber that acts as a Fiber Scheduler for all Fibers on that thread. Additionally, it starts up a new Thread to run an IOLoop. This thread never exits. Calling methods on the `IO::Async` classes passes responsibility to the local thread's Fiber Scheduler. The request is packaged up and sent to the IOLoop via a mailbox. The Fiber Scheduler then waits for a reply by blocking on an incoming mailbox. At this time, the calling thread goes to sleep. The IOLoop receives the request on its mailbox. If the request is for a blocking function (`open`, `close`, `fcntl`, etc.) the request is passed to a small thread pool to execute the blocking function. Upon completion, the request fulfills a private Promise which passes the result back to the correct Fiber Scheduler. If the request is nonblocking (e.g. `read`, `write`, `recv`, etc.) then the file descriptor is registered for the required operation with the Poller. When the Poller detects that the read/write will succeed, it executes the request. The request also fulfills a Promise which sends the result back to the correct Fiber Scheduler. The Fiber Scheduler wakes up, retrieves the promised result, and returns the result to the original calling Fiber. The Fiber wakes up, parses the result, and passes it back to the caller. Done.
+    A. When the `Async` portion of the library is loaded, any call to its IO methods will setup the asynchronous infrastructure if it hasn't been started yet. The calling thread creates a new Fiber that acts as a Fiber Scheduler for all Fibers on that thread. Additionally, it starts up a new Thread to run an IOLoop. This thread never exits. Calling methods on the `IO::Async` classes passes responsibility to the local thread's Fiber Scheduler. The request is packaged up and sent to the IOLoop via a thread-safe mailbox. The Fiber Scheduler then allows any waiting fibers to run. When all runnables are blocked on IO or have exited, the scheduler waits for replies to outstanding IO by blocking on an incoming mailbox. At this time, the calling thread goes to sleep. The IOLoop receives the request on its mailbox. If the request is for a blocking function (`open`, `close`, `fcntl`, etc.) the request is passed to a small thread pool to execute the blocking function. Upon completion, the request fulfills a private Promise which passes the result back to the correct Fiber Scheduler. If the request is nonblocking (e.g. `read`, `write`, `recv`, etc.) then the file descriptor is registered for the required operation with the Poller. When the Poller detects that the read/write will succeed, it executes the request. The request also fulfills a Promise which sends the result back to the correct Fiber Scheduler. The Fiber Scheduler wakes up, retrieves the promised result, and returns the result to the original calling Fiber. The Fiber wakes up, parses the result, and passes it back to the caller. Done.
 
 7. That sounds like a lot of work; is `Async::IO` slow?
 
@@ -52,13 +52,13 @@
 
 8. How does the library yield and resume so many Fibers?
 
-    A. The library takes advantage of a lesser-used feature of Ruby Fibers called `transfer`. Ruby Fibers that use `Fiber.yield` and `Fiber#resume` are considered semi-coroutines. They are semi-coroutines because there is a parent/child relationship between the yielder and the resumer. Any fiber that is resumed *must* yield back to the fiber that resumed it originally. This behavior is insufficient to support the description above regarding how the async support works. Instead, we rely on `Fiber#transfer` which transforms Ruby's Fibers into a full-fledge coroutine. A regular coroutine can call into other Fibers/coroutines and does not need to yield back to its original caller.
+    A. The library takes advantage of a lesser-used feature of Ruby Fibers called `transfer`. Ruby Fibers that use `Fiber.yield` and `Fiber#resume` are considered semi-coroutines. They are semi-coroutines because there is a parent/child relationship between the yielder and the resumer. Any fiber that is resumed *must* yield back to the fiber that resumed it originally. This behavior is insufficient to support the description above regarding how the async support works. Instead, we rely on `Fiber#transfer` which transforms Ruby's Fibers into a full-fledge stackful coroutine. A regular coroutine can call into other Fibers/coroutines and does not need to yield back to its original caller.
 
     For a good discussion on this topic, see [this 2014 paper on distinguishing coroutines and fibers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4024.pdf).
 
 9. `Fiber#transfer` sounds interesting; is there a disadvantage to its use?
 
-    A. Unfortunately, the great power provided by `Fiber#transfer` has some drawbacks. There is a [4 year old bug in the Matz Ruby Interpreter](https://bugs.ruby-lang.org/issues/9664) that prevents a Fiber from calling `Fiber.yield` or `Fiber#resume` once that fiber has ever called `Fiber#transfer`. This used to work in Ruby 1.9 so the hope is that eventually it will be fixed. This bug prevents transferred fibers from using external iterators (what we call `Enumerator`) from being used. An `Enumerator` uses a Fiber internally to yield successful elements of an `Enumerable` object via `Fiber.yield` and `Fiber#resume`.
+    A. Unfortunately, the great power provided by `Fiber#transfer` has some drawbacks. There is a [4 year old bug in the Matz Ruby Interpreter](https://bugs.ruby-lang.org/issues/9664) that prevents a Fiber from calling `Fiber.yield` or `Fiber#resume` once that fiber has ever called `Fiber#transfer`. This used to work in Ruby 1.9 so the hope is that eventually it will be fixed. This bug prevents transferred fibers from using external iterators (what we call `Enumerator`) from being used. An `Enumerator` uses a Fiber internally to yield successive elements of an `Enumerable` object via `Fiber.yield` and `Fiber#resume`.
 
     Additionally, the bug mentioned above also exists in Jruby, TruffleRuby, and Rubinius. They all conform so closely to the Matz Ruby Interpreter that they even allow the same bugs!
 
@@ -84,7 +84,9 @@
 
 12. Why isn't my favorite magic global variable `$_` supported?
 
-    A. A global variable is completely useless in a multi-threaded environment. If many threads are iterating through the same file using the same IO object, what is the true correct value of `$_`? It should probably be protected by a mutex to serialize access, but now that mutex is acting as a "performance gate" by inhibiting all threads accessing it. It's best to not use global variables at all.
+    A. A global variable is completely useless in a multi-threaded environment OR an environment where there are multiple IO objects. If many threads are iterating through the same file using the same IO object, what is the true correct value of `$_`? It should probably be protected by a mutex to serialize access, but now that mutex is acting as a "performance gate" by inhibiting all threads accessing it. It's best to not use global variables at all.
+
+    Similarly, if the program has more than one IO object in use, which one should set the global variable? In current Ruby IO, all of them will update that variable (potentially from multiple threads) thereby rendering it completely useless. The proper way to track line number for IO is on a per-object basis.
     
     Since the File IO objects do not maintain any internal offset information for the file pointer, this information is returned upon the completion of any `read`, `write`, or `each` operation. It's up to the programmer to save and use this information on new `read` or `write` calls to place their bytes in the correct file location.
     
@@ -96,7 +98,7 @@
 
     A. Great question and the hardest to answer. The simple answer is that new gems need to be created to utilize it much like there were gems written to support great projects like `EventMachine`, `Celluloid`, `Celluloid-IO`, `async`, and others. It is also possible to create an adapter layer that would translate the old-style Ruby IO API into calls that conform to this library's API. I may create such an adapter library at some point.
 
-    It should be pointed out that most of those other libraries provide async Sockets only. This library tries to provide async or nonblocking access to Files, Sockets, TTYs, and other IO mechanisms so it's a much more general solution.
+    It should be pointed out that most of those other libraries provide async Sockets only. This library tries to provide both synchronous and nonblocking access to Files, Sockets, TTYs, and other IO mechanisms so it's a much more general solution.
 
 12. I have a question not listed here; how can I get an answer?
 
