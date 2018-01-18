@@ -93,6 +93,14 @@ class IO
             end
           end
 
+          def getsockopt(fd:, level:, option_name:, value:, length:, timeout:)
+            build_blocking_request do |fiber|
+              build_command(fiber) do
+                Platforms::Functions.getsockopt(fd, level, option_name, value, length)
+              end
+            end
+          end
+
           def bind(fd:, addr:, addrlen:, timeout:)
             build_blocking_request do |fiber|
               build_command(fiber) do
@@ -101,12 +109,52 @@ class IO
             end
           end
 
+          # Non-blocking connect is somewhat complicated. The steps are:
+          # 1. Issue a non-blocking connect request
+          # 2. If returns 0, succeeded immediately and can continue
+          # 3. If returns -1 and EAGAIN/EWOULDBLOCK, then issue an async
+          #    request on this FD to see when it becomes writable. This
+          #    indicates the #connect has completed.
+          # 4. Writable callback should do nothing more than return. Next
+          #    step is important.
+          # 5. Issue #getsockopt call to retrieve SO_ERROR.
+          # 6. If error is 0, connect completed successfully. If
+          #    non-zero, this is errno and should be reported back to
+          #    caller.
+          #
+          # Fitting all of these steps in here is crucial.
           def connect(fd:, addr:, addrlen:, timeout:)
-            build_blocking_request do |fiber|
+            reply = Platforms::Functions.connect(fd, addr, addrlen)
+            return reply if reply[:rc].zero? || connect_failed?(reply)
+
+            # step 3
+            reply = build_poll_write_request(fd: fd, repeat: false) do |fiber|
               build_command(fiber) do
-                Platforms::Functions.connect(fd, addr, addrlen)
+                # step 4
+                { writeable: true }
               end
             end
+
+            # step 5
+            error = ::FFI::MemoryPointer.new(:int)
+            reply = getsockopt(
+              fd: fd,
+              level: Constants::SockOpt::SOL_SOCKET,
+              option_name: Constants::SockOpt::SO_ERROR,
+              value: error,
+              length: error.size
+            )
+
+            # step 6
+            reply[:errno] = error.read_int if reply[:rc] < 0
+            reply
+          end
+
+          def connect_failed?(reply)
+            return false if reply[:rc].zero?
+            errno = reply[:errno]
+
+            errno != Errno::EINPROGRESS::Errno
           end
 
           def listen(fd:, backlog:, timeout:)

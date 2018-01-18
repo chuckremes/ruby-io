@@ -85,6 +85,7 @@ class IO
       # in the changelist before we flush to +kevent+.
       def poll
         Logger.debug(klass: self.class, name: 'kqueue poller', message: 'calling kevent')
+        t = shortest_timeout
         rc = Platforms.kevent(@kq_fd, @events[0], @change_count, @events[0], MAX_EVENTS, shortest_timeout)
         @change_count = 0
         Logger.debug(klass: self.class, name: 'kqueue poller', message: "kevent returned [#{rc}] events!")

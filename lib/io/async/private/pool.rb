@@ -5,11 +5,14 @@ class IO
         def initialize(size: 2)
           @size = size
           @inbox = Mailbox.new
-          @threads = Internal::Thread.new do |thr|
-            Logger.debug(klass: self.class, name: :new, message: 'launch worker pool thread')              
-            loop do
-              request = @inbox.pickup(nonblocking: false)
-              process(request)
+          @threads = []
+          @size.times do |i|
+            Internal::Thread.new do |thr|
+              Logger.debug(klass: self.class, name: :new, message: "launch worker pool thread-#{i}")
+              loop do
+                request = @inbox.pickup(nonblocking: false)
+                process(request: request, index: i)
+              end
             end
           end
         end
@@ -18,11 +21,11 @@ class IO
           @inbox.post(request)
         end
 
-        def process(request)
+        def process(request:, index:)
           # Executes the command (saved as a closure). Any reply is
           # communicated via a Promise directly back to the calling Fiber
           # Scheduler that originated request.
-          Logger.debug(klass: self.class, name: :process, message: 'executing command in pool')
+          Logger.debug(klass: self.class, name: :process, message: "executing command in pool thread-#{index}")
           request.call
         end
       end

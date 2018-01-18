@@ -26,6 +26,7 @@ class IO
     attach_function :sendto, [:int, :pointer, :size_t, :int, :pointer, :socklen_t], :ssize_t, :blocking => true
     attach_function :recv, [:int, :pointer, :size_t, :int], :ssize_t, :blocking => true
     attach_function :pipe, [:pointer], :int, :blocking => true
+    attach_function :getsockopt, [:int, :int, :int, :pointer, :pointer], :int, :blocking => true
 
     # utilities
     attach_function :fcntl, [:int, :int, :int], :int, :blocking => true

@@ -153,6 +153,7 @@ class IO
           # this won't work until I get +timeout+ hooked up and functional.
           while @accept_loop
             begin
+              start_call = Time.now
               rc, errno, address, socket = safe_delegation do |context|
                 rc, errno, address, socket = context.accept(timeout: timeout)
                 [rc, errno, address, socket]

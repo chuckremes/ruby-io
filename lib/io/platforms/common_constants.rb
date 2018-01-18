@@ -46,7 +46,7 @@ class IO
       F_SETLKW    = Fcntl::F_SETLKW
       F_UNLCK     = Fcntl::F_UNLCK
       F_WRLCK     = Fcntl::F_WRLCK
-      
+
       # flags
       O_ACCMODE   = Fcntl::O_ACCMODE
       O_APPEND    = Fcntl::O_APPEND
@@ -59,9 +59,9 @@ class IO
       O_RDWR      = Fcntl::O_RDWR
       O_TRUNC     = Fcntl::O_TRUNC
       O_WRONLY    = Fcntl::O_WRONLY
-      
+
       PAGESIZE    = 4096 #Platforms.getpagesize
-      
+
       module FCNTL
         FD_CLOEXEC  = Constants::FD_CLOEXEC
         # commands
@@ -76,7 +76,7 @@ class IO
         F_SETLKW    = Constants::F_SETLKW
         F_UNLCK     = Constants::F_UNLCK
         F_WRLCK     = Constants::F_WRLCK
-      
+
         # flags
         O_ACCMODE   = Constants::O_ACCMODE
         O_APPEND    = Constants::O_APPEND
@@ -89,6 +89,12 @@ class IO
         O_RDWR      = Constants::O_RDWR
         O_TRUNC     = Constants::O_TRUNC
         O_WRONLY    = Constants::O_WRONLY
+      end
+
+      module SockOpt
+        SOL_SOCKET = 0xffff
+
+        SO_ERROR   = 0x1007
       end
     end
   end

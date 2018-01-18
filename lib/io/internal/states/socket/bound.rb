@@ -12,7 +12,8 @@ class IO
           def close(timeout: nil)
             results = @backend.close(fd: @fd, timeout: timeout)
             rc = results[:rc]
-            if rc.zero? || Errno::EBADF == rc
+            errno = results[:errno]
+            if rc.zero? || Errno::EBADF::Errno == errno
               [0, nil, Closed.new(fd: -1, backend: @backend)]
             else
               if Errno::EINTR == rc
