@@ -164,11 +164,13 @@ In case of #accept, we need to fulfill and return a new promise each time we acc
 
 Perhaps the idea above can be generalized for other commands too like read & write. If given a block then continue running and return a Promise for every X bytes read/written.
 
+```ruby
 read = NonblockingCommand.new(mailbox: outbox, with_block: true/false) do
   # not sure...
   # if with_block is true, then generate a new promise for every iteration. If no block,
   # this this is a one-shot.
 end
+```
 
 I might need to back up here and write the end user code with an ideal API. That API can then drive some of these decisions.
 
@@ -247,6 +249,8 @@ The `Sync` module is the namespace dedicated to all classes handling blocking IO
 While the underlying operating system may allow passing flags to allow for non-blocking behavior, this class does not have any special support that operation at all. It would need to be explicitly handled by the programmer. For nicer non-blocking or asynchronous IO work, see `Async`.
 
 ## Inheritance Tree
+
+```
 Sync
 |
 |---------------------------------------------------------------------
@@ -272,11 +276,13 @@ FCNTL   Stat    Config     Timer       Block          Stream        IOCTL
                                                                |- RAW
                                                                |- UNIX
                                                                |- Pair
+```
 
 All SyncIO works on ASCII-8BIT. To use Encodings, create an IO::Transcoder and pass in the SyncIO::Block or SyncIO::Stream instance. Do all read/write operations on the transcoder instance.
 
 AsyncIO will inherit from SyncIO::Block, SyncIO::FCNTL, and SyncIO::Stat to avoid duplication of effort. None of these operations are truly non-blocking/asynchronous so they will be handed off to a thread pool for completion. The AsyncIO::Stream and AsyncIO::Timer classes can be truly non-blocking so this code may or may not inherit generic functionality from the SyncIO parent classes. To be determined.
 
+```
 Async
 |
 |-----------------------------------------------------------------------------
@@ -299,7 +305,9 @@ Block              Stream        Timer             FCNTL  IOCTL  Stat      "Enum
                            |- RAW
                            |- Pair
 
+```
 
+```
 IO
 |
 |---------------------------------------------------------------------------------
@@ -310,6 +318,7 @@ Internal            Async            Sync         Config      Constants      Tra
    |-- Private
    |
    |-- Platforms -- Functions, et al
+```
 
 Each SyncIO or AsyncIO io object will have a stat function so we can retrieve information on the open file descriptor. That method will likely delegate to Stat.fstat which will return an instance of Stat. This way we stat the file once and can (at our leisure) get various details from it such as birthtime, file type, etc. without re-stat'ing the file for each inquiry. Stat.lstat and Stat.stat will also exist and behave similarly.
 
@@ -343,6 +352,7 @@ NEXT
 * do NOT get sidetracked by fcntl, rearranging inheritance hierarchies, etc. Implement the MINIMUM necessary to get the above bullets done!! Refactor later!!
 * audit for imperative shell, functional core
 
+```ruby
 def write_append(&blk)
   offset = Stat.fstat(@fd).length # get file size
   loop do
@@ -350,12 +360,16 @@ def write_append(&blk)
     offset += bytes
   end
 end
+```
 
 Use like:
+
+```ruby
 write_append do |io, current_offset|
   bytes_written = io.write(offset: current_offset, buffer: some_string)
   bytes_written # must pass back number of bytes written to adjust offset
 end
+```
 
 NOTE
 To prevent writes from being lost when the Ruby runtime is exiting, the main thread will need to somehow join on the IOLoop and signal it to exit upon completion. I imagine this means the IOLoop will need to deregister all of its FDs and let the loop cycle at least once to flush any pending writes. This could be tricky.
@@ -363,6 +377,7 @@ To prevent writes from being lost when the Ruby runtime is exiting, the main thr
 UNIX domain sockets do NOT provide out-of-band data like TCP sockets. Neither do UDP sockets.
 
 All socket combinations:
+
 AF_INET, SOCK_STREAM, IPPROTO_TCP => TCP v4 socket (sockaddr_in)
 AF_INET, SOCK_DGRAM, IPPROTO_UDP => UDP v4 socket (sockaddr_in)
 AF_INET6, SOCK_STREAM, IPPROTO_TCP => TCP v6 socket (sockaddr_in6)
@@ -394,6 +409,7 @@ Each of these internal behavior objects responds to all methods though they will
 things based upon the state.
 
 Delete a message to the internal context safely.
+```ruby
 def safe_delegation  #(&blk)
   @mutex.synchronize do
     yield(@context)
@@ -405,8 +421,11 @@ def change_context_to(klass, **args)
   # only set at instantiation
   @context = klass.new(**args)
 end
+```
 
 Called like:
+
+```ruby
 def bind(addr)
   safe_delegation do |context|
     rc, errno = context.bind(addr)
@@ -416,6 +435,7 @@ def bind(addr)
     [rc, errno]
   end
 end
+```
 
 By convention the @context ivar is only directly accessed in #safe_delegation and #change_context_to. Those are the only two methods that can read or modify the ivar directly. Everwhere else that ivar is used within a block where it's passed in as a block argument. This prevents those blocks from resetting @context (though they could... but it would defy the convention).
 
@@ -423,6 +443,7 @@ We will probably need to nest the behavior change down one level. The outer shel
 
 Example:
 
+```ruby
 class SocketShell
   def inititalize(**args)
     ...
@@ -464,6 +485,7 @@ class Open
     [behavior, rc, errno]
   end
 end
+```
 
 GETADDRINFO
 This is a real workhorse of a function. 
@@ -474,7 +496,9 @@ ai_protocol: IPPROTO_UDP or IPPROTO_TCP or IPPROTO_RAW
 SOCKET CREATION
 The call to socket(2) allows for the programmer to pass the domain, type, and protocol directly. However, I am making the choice to not expose this particular method. To create a socket, the creation must use the values from a valid addrinfo struct. So the process to create a socket will look something like this:
 
+```ruby
 socket = Socket.open(hostname: host, port: service, tcp4: true)
+```
 
 https://stackoverflow.com/questions/5385312/ipproto-ip-vs-ipproto-tcp-ipproto-udp
 
@@ -505,22 +529,23 @@ Note that TruffleRuby just improved #gets and #each by making sure to only insta
 The Transcode class(es) will provide their own #each methods that work on characters. When reading unicode, we know that 16-byte chars and 32-byte chars always take the same amount of space. Converting from bytes to chars is a simple multiplication. UTF-8 is trickier since a char can be anywhere from 1 to 4 bytes long. To read 80 chars requires reading AT LEAST 80 bytes and perhaps as many as 320 bytes.
 
 The methods in original Ruby IO that support enumeration of the IO stream are:
-IO.foreach
-IO.readlines
-IO#each
-IO#each_byte
-IO#each_char
-IO#each_codepoint
-IO#each_line
-IO#getbyte
-IO#getc
-IO#gets
-IO#readbyte
-IO#readchar
-IO#readline
-IO#readlines
-IO#ungetbyte
-IO#ungetc
+
+- IO.foreach
+- IO.readlines
+- IO#each
+- IO#each_byte
+- IO#each_char
+- IO#each_codepoint
+- IO#each_line
+- IO#getbyte
+- IO#getc
+- IO#gets
+- IO#readbyte
+- IO#readchar
+- IO#readline
+- IO#readlines
+- IO#ungetbyte
+- IO#ungetc
 
 Several of these are duplicates of each other and differ only in how EOF is handled (return empty string or raise EOFError). Additionally, several of them take in multiple options depending on their position in the method argument list (each, readlines). Lastly, some methods differ in that they update a global variable after each line (or not).
 
@@ -532,6 +557,7 @@ IO.readlines, IO#each_char, IO#each_codepoint, IO#each_line, IO#getc, IO#gets, I
 
 The basis of all is IO#each. In current Ruby, IO#each works on lines/strings. For a system that works with ASCII_8BIT this kind of doesn't make sense. Let's suggest that #each only works on bytes and will read those bytes with some +limit+. The other methods can compose their operations on top of the work that #each performs.
 
+```ruby
 def each(offset:, limit:)
   ...
 end
@@ -539,6 +565,7 @@ end
 def each_byte(offset:)
   each(offset: offset, limit: 1) { |byte| yield(byte) }
 end
+```
 
 The above looks nice, but those in the know will see a performance problem. There will be lots of method overhead to read a single byte at a time from a stream. Since we always specify the starting offset, the #each method could intelligently buffer data internally. It will maintain state local to its own method. We might waste some effort reading more than we need to read but that will be neglible over time. Anyone who is truly worried about that can just issue #read(offset:, length:) commands directly which will do NO buffering.
 
@@ -558,6 +585,7 @@ Create a LimitReader class that provides the #each functionality. It should be a
 FFI Select & FDSet
 FFI can't wrap macros. Luckily the select(2) macros are fairly simple and the fd_set struct is the same on all platforms. FD_SETSIZE is a max of 1024 and defaults to 64 on some platforms. We'll always allocate 1024.
 
+```ruby
 class FDSet < FFI::Struct
   # Not sure how the bits are laid out in memory, so some experimentation will be necessary
   layout \
@@ -601,6 +629,7 @@ class FDSet < FFI::Struct
     nibble_index = (index % 8) - 1 # remember to use 0-based indexing
   end
 end
+```
 
 ASYNC SLEEP & TIMERS
 Here's how it should work...
@@ -625,16 +654,19 @@ It's really hard to get away from exceptions though in a language that allows so
 
 So let's puzzle through this. If the above is accepted as fact ("mutiny"), then we can't avoid exceptions in all cases even when the programmer sets the policy to ReturnCode. Let's say that only direct IO calls (open, read, write, close, and its ilk) conform to the ReturnCode protocol. All other code (that only does a syscall *indirectly* by calling a method that conforms to ReturnCode) will interpret those codes and raise them as exceptions. Maybe I can make it super easy on myself by providing something like ReturnCode#to_exception so it transforms itself.
 
+```ruby
 def foo
   return_code = somesyscall(...)
   raise return_code.to_exception if return_code.error?
 end
+```
 
 SYSCALL ERRORS
 Oh, Ruby, your inconsistency is killing me. See this note from the IOError rdoc: "Note that some IO failures raise SystemCallErrors and these are not subclasses of IOError:"
 
 Yep, IO can raise Errno errors, IOErrors, and of course, EOFErrors. Time to pull all of these under one umbrella and make sense of them.
 
+```ruby
 class IO
   module Error
     module Errno < SystemCallError # just like current Ruby
@@ -647,6 +679,7 @@ class IO
     end
   end
 end
+```
 
 SPECS
 All specs should be written as shared specs. That is, any spec that passes in the Sync classes should also pass for the Async classes. This goal may not be possible to achieve; we'll see.
@@ -654,10 +687,12 @@ All specs should be written as shared specs. That is, any spec that passes in th
 UNICODE
 FYI, you can use Array#pack and String#unpack to build arbitrary UTF-8 strings. I ran this code to convert the numbers 0 to 255 into UTF-8 and then back into integers so I could see the encoding.
 
+```ruby
 array = 256.times.to_a.map {|v| v}
 utf8 = array.pack("U*")
 puts "size #{utf8.size}, bytesize #{utf8.bytesize}" => size 256, bytesize 384
 bytes = utf8.unpack("C*")
+```
 
 Turns out that representing 0 to 255 (integer) in UTF-8 takes 384 bytes. From 0 to 127 UTF-8 can represent normal ASCII in a single byte. For 128 to 255, it takes a second byte to represent the codepoint.
 
@@ -701,10 +736,13 @@ As a side benefit, __read__ will be available for truly unbuffered reads. Anyone
 
 NON-POSIX FUNCTIONS
 OSX has kqueue. Linux has epoll. Both have #writev, #readv, and a bunch of others that are not part of POSIX. These non-POSIX functions could be added to a PlatformsMixin... Platforms::Mixin::Linux and Platforms::Mixin::BSD or whatever. During instantiation of a class, it could do something like:
+
+```ruby
   class Bar < Foo
     include Platforms::Mixin::Linux if Platforms.linux?
     include Platforms::Mixin::BSD if Platforms.bsd?
   end
+```
 
 This would allow us to provide support for platform-specific functions at runtime. I'm sure there's more than one way to skin this cat, so play around with a few options.
 
@@ -720,7 +758,7 @@ Returns a Config::File object. Given a `fd` argument, the `path` argument is ign
 
 Given a `path` argument with a trailing slash, the slash will be removed.
 
-```
+```ruby
 config = SyncIO::Config.file_from(fd: 1, path: '/path/will/be/ignored')
 io = SyncIO.new(file_config: config)
 ```
@@ -775,7 +813,8 @@ If source_offset is given, it specifies the start position of the copy.
 
 Both source and destination are closed upon completion.
 
-Raises an IOError in the following situations: 
+Raises an IOError in the following situations:
+
 * source does not exist
 * destination location is not writable
 * destination runs out of space
@@ -804,6 +843,7 @@ One of the inspirations for writing this library was to have a solid foundation 
 FIBER SCHEDULER
 While thinking about producing an "echo server" example, I realized that we couldn't easily spool up a bunch of "connect" requests. Here's the potential pseudo-code.
 
+```
 1  10.times do |i|
 2    socket[i].connect(addr: addr) do |sock, remote_addr| # connect will suspend fiber
 3      rc, errno, string = sock.recv  # will suspend fiber
@@ -812,7 +852,8 @@ While thinking about producing an "echo server" example, I realized that we coul
 6      # exit block...
 7    end
 8  end
-  
+```
+
 I marked each line above where the fiber will suspend. Walking through this, we will suspend on line 2 when we call #connect. When it returns, we'll spin up a new Fiber to execute the block and transfer to it. That fiber will suspend on lines 3 and 5. However, those suspensions will not pick up any execution from line 2 to line 8 and then back to top of loop. So we'll be processing the #connects in lock-step form. I don't like this.
 
 Instead, we will suspend on line 2 as before inside the #connect call. When it returns a connection, we will mark the fiber that the #connect ran in as "eligigle for more work". We'll then create a new fiber for the connect block and transfer to it. When that fiber suspends on line 3, we enter the Fiber Scheduler. We'll package up the request and send it to the IOLoop. Normally at this point we would block waiting for a response.
@@ -830,6 +871,7 @@ Obviously we need a way to build `fiber_list` in the scheduler. Perhaps every fi
 STRUCTS
 Need some simple objects to return errors. e.g.
 
+```ruby
 class Err
   attr_reader :rc, :errno
   
@@ -838,15 +880,19 @@ class Err
     @errno = errno
   end
 end
+```
 
 Also need simple objects to return useful data to #each blocks, #accept blocks, etc.
 
 e.g.
+
+```ruby
 class EachResult
   attr_reader :string, :offset
   
   ...
 end
+```
 
 These need to be cheap and fast to allocate and populate. Structs might be a good choice though I wish they supported keyword args pre-2.5.0. 
 
