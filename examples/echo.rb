@@ -45,16 +45,16 @@ server_thread = IO::Internal::Thread.new do
         if string == 'exit'
           server_wait = false
           puts "Server received exit message, server_wait [#{server_wait}]" if DEBUG
-          rc, errno = socket.ssend(buffer: 'goodbye', nbytes: 'goodbye'.size, flags: 0)
+          rc, errno = socket.send(buffer: 'goodbye', nbytes: 'goodbye'.size, flags: 0)
           puts "SERVER: marking accept loop break"
           server.accept_break
         elsif server_wait
           timer_reply = IO::Async::Timer.sleep(seconds: rand(RAND_SLEEP))
           puts "Server echoing back: #{string}"
-          rc, errno = socket.ssend(buffer: string, nbytes: string.size, flags: 0)
+          rc, errno = socket.send(buffer: string, nbytes: string.size, flags: 0)
           server_sent += 1
           server_wait = false if server_sent >= ClientCount - 1
-          puts "#{tid}, iteration-#{i}, SERVER: ssend: rc [#{rc}], errno [#{errno}], server_sent [#{server_sent}], server_wait [#{server_wait}]" if DEBUG
+          puts "#{tid}, iteration-#{i}, SERVER: send: rc [#{rc}], errno [#{errno}], server_sent [#{server_sent}], server_wait [#{server_wait}]" if DEBUG
           puts "#{tid}, iteration-#{i}, SERVER: closing socket" if DEBUG
           # +socket+ closes automatically when block exits
         end
@@ -95,10 +95,10 @@ client_thread = IO::Internal::Thread.new do
         raise "Client-#{i} failed to connect, rc [#{rc}], errno [#{errno}]" if rc < 0
 
         msg = "echo message: #{i}"
-        puts "#{tid}, CLIENT-#{i}: ssend reply, msg [#{msg}]" if DEBUG
+        puts "#{tid}, CLIENT-#{i}: send reply, msg [#{msg}]" if DEBUG
         puts "Client-#{i} sending message: #{msg}"
-        rc, errno = sock.ssend(buffer: msg, nbytes: msg.size, flags: 0)
-        puts "#{tid}, CLIENT-#{i}: ssend: rc [#{rc}], errno [#{errno}]" if DEBUG
+        rc, errno = sock.send(buffer: msg, nbytes: msg.size, flags: 0)
+        puts "#{tid}, CLIENT-#{i}: send: rc [#{rc}], errno [#{errno}]" if DEBUG
         rc, errno, string = sock.recv(buffer: nil, nbytes: 20, flags: 0)
         puts "#{tid}, CLIENT-#{i}: recv: rc [#{rc}], errno [#{errno}], string [#{string}]" if DEBUG
         puts "Client-#{i} received message: #{string}, roundtrip time [#{Time.now - client_sent_time}] seconds"
@@ -123,7 +123,7 @@ client_thread = IO::Internal::Thread.new do
   client.connect(addr: addr) do |sock, rc, errno|
     raise "Client-last failed to connect, rc [#{rc}], errno [#{errno}]" if rc < 0
     puts "Last client telling Server to exit..."
-    rc, errno = sock.ssend(buffer: 'exit', nbytes: 'exit'.size, flags: 0)
+    rc, errno = sock.send(buffer: 'exit', nbytes: 'exit'.size, flags: 0)
     raise "Client-last failed to send message, rc [#{rc}], errno [#{errno}]" if rc < 0
     completed_count += 1
     rc, errno, string = sock.recv(buffer: nil, nbytes: 20, flags: 0)
