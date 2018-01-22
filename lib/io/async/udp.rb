@@ -6,7 +6,7 @@ require 'io/internal/states/socket/open'
 class IO
   module Async
 
-    class TCP
+    class UDP
       class << self
         def open(domain:, type:, protocol:, timeout: nil)
           Private.setup
@@ -14,14 +14,14 @@ class IO
 
           if result[:rc] > 0
             if Platforms::PF_INET == domain
-              TCP4.new(fd: result[:rc])
+              UDP4.new(fd: result[:rc])
             elsif Platforms::PF_INET6 == domain
-              TCP6.new(fd: result[:rc])
+              UDP6.new(fd: result[:rc])
             else
               # Temporary raise... should respect the set Policy. If socket
               # failed to open, return a TCP socket in the Closed state.
-              # TCP.new(fd: nil, state: :closed)
-              raise "Unknown Protocol Family [#{domain}] for TCP socket!"
+              # UDP.new(fd: nil, state: :closed)
+              raise "Unknown Protocol Family [#{domain}] for UDP socket!"
             end
           else
             raise "failed to allocate socket"
@@ -41,7 +41,7 @@ class IO
           hints = Platforms::AddrInfoStruct.new
           hints[:ai_flags] = Platforms::AI_PASSIVE
           hints[:ai_family] = Platforms::AF_UNSPEC
-          hints[:ai_socktype] = Platforms::SOCK_STREAM
+          hints[:ai_socktype] = Platforms::SOCK_DGRAM
 
           getaddrinfo(hostname: hostname, service: service, hints: hints, timeout: timeout)
         end
@@ -51,7 +51,7 @@ class IO
           hints = Platforms::AddrInfoStruct.new
           hints[:ai_flags] = Platforms::AI_PASSIVE
           hints[:ai_family] = Platforms::PF_INET
-          hints[:ai_socktype] = Platforms::SOCK_STREAM
+          hints[:ai_socktype] = Platforms::SOCK_DGRAM
 
           getaddrinfo(hostname: hostname, service: service, hints: hints, timeout: timeout)
         end

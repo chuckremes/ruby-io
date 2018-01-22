@@ -84,11 +84,11 @@ class IO
         @policy = error_policy || Config::Defaults.error_policy
 
         @context = if :open == state
-          Internal::States::TCP::Open.new(fd: fd, backend: Internal::Backend::Sync, parent: self)
+          Internal::States::Socket::Open.new(fd: fd, backend: Internal::Backend::Sync, parent: self)
         elsif :connected == state
-          Internal::States::TCP::Connected.new(fd: fd, backend: Internal::Backend::Sync)
+          Internal::States::Socket::Connected.new(fd: fd, backend: Internal::Backend::Sync)
         else
-          Internal::States::TCP::Closed.new(fd: -1, backend: Internal::Backend::Sync)
+          Internal::States::Socket::Closed.new(fd: -1, backend: Internal::Backend::Sync)
         end
       end
 

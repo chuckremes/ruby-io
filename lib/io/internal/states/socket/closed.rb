@@ -1,7 +1,7 @@
 class IO
   module Internal
     module States
-      class TCP
+      class Socket
         class Closed
           def initialize(fd:, backend:, parent: nil)
             @fd = fd
