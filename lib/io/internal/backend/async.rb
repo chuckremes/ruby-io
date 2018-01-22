@@ -173,10 +173,10 @@ class IO
             end
           end
 
-          def ssend(fd:, buffer:, nbytes:, flags:, timeout:)
+          def send(fd:, buffer:, nbytes:, flags:, timeout:)
             build_poll_write_request(fd: fd, repeat: false) do |fiber|
               build_command(fiber) do
-                Platforms::Functions.ssend(fd, buffer, nbytes, flags.to_i)
+                Platforms::Functions.send(fd, buffer, nbytes, flags.to_i)
               end
             end
           end

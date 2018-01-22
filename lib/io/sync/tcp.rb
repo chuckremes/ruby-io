@@ -130,9 +130,9 @@ class IO
         block_given? ? yield(address, socket, rc, errno) : [address, socket, rc, errno]
       end
 
-      def ssend(buffer:, nbytes:, flags:)
+      def send(buffer:, nbytes:, flags:)
         safe_delegation do |context|
-          rc, errno = context.ssend(buffer: buffer, nbytes: nbytes, flags: flags)
+          rc, errno = context.send(buffer: buffer, nbytes: nbytes, flags: flags)
           [rc, errno]
         end
       end

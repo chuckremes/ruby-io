@@ -45,8 +45,8 @@ class IO
             [-1, Errno::EINVAL]
           end
 
-          def ssend(buffer:, nbytes:, flags:, timeout: nil)
-            reply = @backend.ssend(fd: @fd, buffer: buffer, nbytes: nbytes, flags: flags, timeout: timeout)
+          def send(buffer:, nbytes:, flags:, timeout: nil)
+            reply = @backend.send(fd: @fd, buffer: buffer, nbytes: nbytes, flags: flags, timeout: timeout)
             [reply[:rc], reply[:errno]]
           end
 

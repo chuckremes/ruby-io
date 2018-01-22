@@ -127,8 +127,8 @@ class IO
         end
 
         # man -s 2 send for description of purpose, return codes, and errno
-        def ssend(fd, buffer, bufferlen, flags)
-          rc = Platforms.ssend(fd, buffer, bufferlen, flags)
+        def send(fd, buffer, bufferlen, flags)
+          rc = Platforms.send(fd, buffer, bufferlen, flags)
           errno = rc < 0 ? ::FFI.errno : nil
           Logger.debug(klass: self.class, name: 'send_command', message: "rc [#{rc}], errno [#{errno}]")
           reply(rc: rc, errno: errno)

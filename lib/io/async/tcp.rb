@@ -189,9 +189,9 @@ class IO
         @accept_loop = false
       end
 
-      def ssend(buffer:, nbytes:, flags:, timeout: nil)
+      def send(buffer:, nbytes:, flags:, timeout: nil)
         safe_delegation do |context|
-          rc, errno = context.ssend(buffer: buffer, nbytes: nbytes, flags: flags, timeout: timeout)
+          rc, errno = context.send(buffer: buffer, nbytes: nbytes, flags: flags, timeout: timeout)
           [rc, errno]
         end
       end

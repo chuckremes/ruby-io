@@ -62,7 +62,7 @@ class IO
             [-1, Errno::EBADF, nil]
           end
 
-          def ssend(buffer:, nbytes:, flags:, timeout: nil)
+          def send(buffer:, nbytes:, flags:, timeout: nil)
             sendto(addr: nil, buffer: buffer, flags: flags, timeout: timeout)
           end
 

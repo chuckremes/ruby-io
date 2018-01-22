@@ -55,8 +55,8 @@ class IO
             Platforms::Functions.accept(fd, addr, addrlen)
           end
 
-          def ssend(fd:, buffer:, nbytes:, flags:, timeout:)
-            Platforms::Functions.ssend(fd, buffer, nbytes, flags)
+          def send(fd:, buffer:, nbytes:, flags:, timeout:)
+            Platforms::Functions.send(fd, buffer, nbytes, flags)
           end
 
           def recv(fd:, buffer:, nbytes:, flags:, timeout:)

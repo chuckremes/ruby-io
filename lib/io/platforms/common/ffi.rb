@@ -21,7 +21,7 @@ class IO
     attach_function :connect, [:int, :pointer, :socklen_t], :int, :blocking => true
     attach_function :listen, [:int, :int], :int, :blocking => true
     attach_function :accept, [:int, :pointer, :pointer], :int, :blocking => true
-    attach_function :ssend, :send, [:int, :pointer, :size_t, :int], :ssize_t, :blocking => true
+    attach_function :send, :send, [:int, :pointer, :size_t, :int], :ssize_t, :blocking => true
     attach_function :sendmsg, [:int, :pointer, :int], :ssize_t, :blocking => true
     attach_function :sendto, [:int, :pointer, :size_t, :int, :pointer, :socklen_t], :ssize_t, :blocking => true
     attach_function :recv, [:int, :pointer, :size_t, :int], :ssize_t, :blocking => true
