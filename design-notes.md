@@ -808,7 +808,7 @@ While thinking about producing an "echo server" example, I realized that we coul
 2    socket[i].connect(addr: addr) do |sock, remote_addr| # connect will suspend fiber
 3      rc, errno, string = sock.recv  # will suspend fiber
 4      # echo back
-5      sock.ssend(string) # will suspend fiber
+5      sock.send(string) # will suspend fiber
 6      # exit block...
 7    end
 8  end
@@ -966,3 +966,42 @@ I can't seem to reproduce the issues I mention above. MRI has some weird timing 
 TIMEOUTS
 I think I have timeouts figured out for async calls. When building the async command, I always pass the timeout arg. The command should build an Async::Timer. It can register itself via the #selector_update call when the command registers itself for a read/write update. It will piggyback on the +poller+ ref and register for a timer event. The Timer callback should include the *SAME* Promise as the read/write call. Whoever succeeds first, wins.
 
+NAMESPACE
+Right now I have the IO::Async and IO::Sync namespaces. Both of those will have the exact same sub-namespaces and the method sigantures should be equivalent. I think keeping them separate is now probably a mistake. I'm thinking that the "facade" or API shell should be a single namespace. The user can pick sync or async via a keyword arg passed to any class method that creates an object instance or via a keyword arg passed directly to a class's #initialize.
+
+The different codepaths will exist in the @backend. So, when creating a File.new, do something like:
+
+  f = IO::File.new(async: true, **otherargs)
+  
+  def initialize(async: false, ...)
+    @backend = Internal::Backend.chooser(async) # returns Backend::Sync or Backend::Async
+    ...
+  end
+
+So we can swap backends via a single arg to get the different behavior.
+
+I'll probably continue pushing forward on fleshing out the Async namespace for now. Need to get Stream, TCP, and TTY into a usable state. Also need UDP to be usable. Then I'll collapse the namespace to just IO and eliminate the Async/Sync namespace.
+
+DIRECTORY
+opendir, readdir, closedir, etc don't really fit into the hierarchy that's forming up. If I had to wedge it in somewhere, and I do, then I'd put it in the RandomAccess tree with File and String. It isn't a StreamAccess type since we can seek around.
+
+UPDATED TREE
+Some things don't fit neatly into an inheritance tree. For example, while UDP and TCP are both sockets the UDP type is datagram while TCP is a stream. Similarly, UNIX sockets can be either datagram OR stream. Trying to rationalize this and put it into a tree just doesn't work.
+IO
+|
+|--------------------------------------------------------------------------------------------------
+|                                 |            |              |          |            |           |
+Internal                        Config      Constants      Transcoder   Random      Stream     Datagram
+   |                                                                     |            |           |
+   |                                                                     |- File      |- TCP      |- UDP
+   |-- Private                                                           |- Directory |- TTY
+   |
+   |-- Platforms 
+       -- Functions, et al
+
+Need to continue thinking on this. Will implement UDP and see what refactoring opportunities arise.
+
+READ/WRITE/SEND/RECV
+For sockets, read is the same as recv with a 0 flag. Same for write/send.
+
+Read/write make sense for files, strings, directories, pipes/fifos, and TTYs. Send/recv makes sense for RAW, TCP, UDP, and UNIX domain sockets. However, we should provide a read/write that just delegate to their recv/send partners with the appropriate flag value.
