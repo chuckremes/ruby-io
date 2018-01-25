@@ -1,6 +1,7 @@
 require 'io/internal/states/socket/closed'
 require 'io/internal/states/socket/bound'
 require 'io/internal/states/socket/connected'
+require 'io/internal/states/socket/unconnected'
 require 'io/internal/states/socket/open'
 
 class IO
@@ -140,53 +141,11 @@ class IO
       end
 
       def listen(backlog:, timeout: nil)
-        safe_delegation do |context|
-          rc, errno = context.listen(backlog: backlog, timeout: timeout)
-          [rc, errno]
-        end
+        [-1, Errno::EOPNOTSUPP]
       end
 
       def accept(timeout: nil)
-        if block_given? && @accept_loop.nil?
-          @accept_loop = true
-          # when #accept gets a block, loop forever accepting connections
-          # this won't work until I get +timeout+ hooked up and functional.
-          while @accept_loop
-            begin
-              start_call = Time.now
-              rc, errno, address, socket = safe_delegation do |context|
-                rc, errno, address, socket = context.accept(timeout: timeout)
-                [rc, errno, address, socket]
-              end
-
-              block = Proc.new do
-                begin
-                  yield(address, socket, rc, errno)
-                ensure
-                  socket.close if socket.respond_to?(:close)
-                end
-              end
-
-              # Schedule block above to be run
-              value = Thread.current.local[:_scheduler_].schedule_fibers(originator: Fiber.current, spawned: block)
-
-              # when transferred back to this fiber, +value+ should be nil
-              raise "transferred back to #connect fiber, but came with non-nil info [#{value.inspect}]" if value
-            end
-          end
-          @accept_loop = nil
-        else
-          rc, errno, address, socket = safe_delegation do |context|
-            rc, errno, address, socket = context.accept(timeout: timeout)
-            [rc, errno, address, socket]
-          end
-
-          [address, socket, rc, errno]
-        end
-      end
-
-      def accept_break
-        @accept_loop = false
+        [-1, Errno::EOPNOTSUPP]
       end
 
       def send(buffer:, nbytes:, flags:, timeout: nil)
@@ -196,9 +155,16 @@ class IO
         end
       end
 
-      def sendto(addr:, buffer:, flags:, timeout: nil)
+      def sendto(buffer:, nbytes:, flags:, addr:, addr_len:, timeout: nil)
         safe_delegation do |context|
-          rc, errno = context.sendto(addr: addr, buffer: buffer, flags: flags, timeout: timeout)
+          rc, errno = context.sendto(
+            buffer: buffer,
+            nbytes: nbytes,
+            flags: flags,
+            addr: addr,
+            addr_len: addr_len,
+            timeout: timeout
+          )
           [rc, errno]
         end
       end
@@ -217,10 +183,17 @@ class IO
         end
       end
 
-      def recvfrom(addr:, buffer:, flags:, timeout: nil)
+      def recvfrom(buffer:, nbytes:, flags:, addr:, addr_len:, timeout: nil)
         safe_delegation do |context|
-          rc, errno = context.recvfrom(addr: addr, buffer: buffer, flags: flags, timeout: timeout)
-          [rc, errno]
+          rc, errno, string, addr, addr_len = context.recvfrom(
+            buffer: buffer,
+            nbytes: nbytes,
+            flags: flags,
+            addr: addr,
+            addr_len: addr_len,
+            timeout: timeout
+          )
+          [rc, errno, string, addr, addr_len]
         end
       end
 
@@ -246,11 +219,29 @@ class IO
       end
     end
 
-    class TCP4 < TCP
+    class UDP4 < UDP
+      class << self
+        def allocate_addr_buffer
+          addr_buffer = Platforms::SockAddrInStruct.new
+          addr_len = ::FFI::MemoryPointer.new(:socklen_t)
+          addr_len.write_uint32(addr_buffer.size)
+          [addr_buffer, addr_len]
+        end
+      end
+
       def protocol_version() '4'; end
     end
 
-    class TCP6 < TCP
+    class UDP6 < UDP
+      class << self
+        def allocate_addr_buffer
+          addr_buffer = Platforms::SockAddrIn6Struct.new
+          addr_len = ::FFI::MemoryPointer.new(:socklen_t)
+          addr_len.write_uint32(addr_buffer.size)
+          [addr_buffer, addr_len]
+        end
+      end
+
       def protocol_version() '6'; end
     end
   end

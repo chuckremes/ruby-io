@@ -54,6 +54,10 @@ class IO
             end
           end
 
+          def disconnectx(timeout: nil)
+            [-1, Errno::ENOTCONN]
+          end
+
           def listen(backlog:, timeout: nil)
             [-1, Errno::EBADF]
           end

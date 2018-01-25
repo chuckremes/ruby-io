@@ -181,12 +181,40 @@ class IO
             end
           end
 
+          def sendto(fd:, buffer:, nbytes:, flags:, addr:, addr_len:, timeout:)
+            request = IO::Async::Private::Request::Sendto.new(
+              Fiber.current,
+              fd: fd,
+              buffer: buffer,
+              nbytes: nbytes,
+              flags: flags,
+              addr: addr,
+              addr_len: addr_len,
+              timeout: timeout
+            )
+            reply = enqueue(request)
+          end
+
           def recv(fd:, buffer:, nbytes:, flags:, timeout:)
             build_poll_read_request(fd: fd, repeat: false) do |fiber|
               build_command(fiber) do
                 Platforms::Functions.recv(fd, buffer, nbytes, flags.to_i)
               end
             end
+          end
+
+          def recvfrom(fd:, buffer:, nbytes:, flags:, addr:, addr_len:, timeout:)
+            request = IO::Async::Private::Request::Recvfrom.new(
+              Fiber.current,
+              fd: fd,
+              buffer: buffer,
+              nbytes: nbytes,
+              flags: flags,
+              addr: addr,
+              addr_len: addr_len,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def timer(duration:)

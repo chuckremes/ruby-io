@@ -44,6 +44,7 @@ require_relative 'io/async/timer'
 require_relative 'io/async/fcntl'
 require_relative 'io/async/file'
 require_relative 'io/async/tcp'
+require_relative 'io/async/udp'
 
 # transcoder
 require_relative 'io/transcode/transcode'

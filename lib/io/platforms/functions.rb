@@ -134,11 +134,27 @@ class IO
           reply(rc: rc, errno: errno)
         end
 
+        # man -s 2 sendto for description of purpose, return codes, and errno
+        def sendto(fd, buffer, bufferlen, flags, addr, addr_len)
+          rc = Platforms.sendto(fd, buffer, bufferlen, flags, addr, addr_len)
+          errno = rc < 0 ? ::FFI.errno : nil
+          Logger.debug(klass: self.class, name: 'sendto_command', message: "rc [#{rc}], errno [#{errno}]")
+          reply(rc: rc, errno: errno)
+        end
+
         # man -s 2 recv for description of purpose, return codes, and errno
         def recv(fd, buffer, bufferlen, flags)
           rc = Platforms.recv(fd, buffer, bufferlen, flags)
           errno = rc < 0 ? ::FFI.errno : nil
           Logger.debug(klass: self.class, name: 'recv_command', message: "rc [#{rc}], errno [#{errno}]")
+          reply(rc: rc, errno: errno)
+        end
+
+        # man -s 2 recvfrom for description of purpose, return codes, and errno
+        def recvfrom(fd, buffer, bufferlen, flags, addr, addr_len)
+          rc = Platforms.recvfrom(fd, buffer, bufferlen, flags, addr, addr_len)
+          errno = rc < 0 ? ::FFI.errno : nil
+          Logger.debug(klass: self.class, name: 'recvfrom_command', message: "rc [#{rc}], errno [#{errno}]")
           reply(rc: rc, errno: errno)
         end
       end

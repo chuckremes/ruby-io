@@ -20,6 +20,10 @@ class IO
             [-1, Errno::EBADF]
           end
 
+          def disconnectx(timeout: nil)
+            [-1, Errno::EBADF]
+          end
+
           def listen(backlog:, timeout: nil)
             [-1, Errno::EBADF]
           end

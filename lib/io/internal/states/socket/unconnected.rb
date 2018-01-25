@@ -2,7 +2,7 @@ class IO
   module Internal
     module States
       class Socket
-        class Connected
+        class Unconnected
           def initialize(fd:, backend:, parent: nil)
             @fd = fd
             @backend = backend
@@ -33,20 +33,24 @@ class IO
           end
 
           def connect(addr:, timeout: nil)
-            # Can only connect once!
-            [-1, Errno::EINVAL]
+            results = @backend.connect(fd: @fd, addr: addr, addrlen: addr.size, timeout: timeout)
+            if results[:rc] < 0
+              [results[:rc], results[:errno], self]
+            else
+              [results[:rc], results[:errno], Connected.new(fd: @fd, backend: @backend)]
+            end
           end
 
           def disconnectx(timeout: nil)
-            raise NotImplementedError
+            [-1, Errno::ENOTCONN]
           end
 
           def listen(backlog:, timeout: nil)
-            [-1, Errno::EINVAL]
+            [-1, Errno::EOPNOTSUPP]
           end
 
           def accept(timeout: nil)
-            [-1, Errno::EINVAL]
+            [-1, Errno::EOPNOTSUPP]
           end
 
           def send(buffer:, nbytes:, flags:, timeout: nil)

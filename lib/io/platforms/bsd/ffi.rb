@@ -328,6 +328,8 @@ class IO
     IPPROTO_UDP = 17
     INET_ADDRSTRLEN = 16
     INET6_ADDRSTRLEN = 46
+    SAE_ASSOCID_ANY = 0
+    SAE_CONNID_ANY = 0
 
   end
 end

@@ -34,8 +34,11 @@ class IO
           end
 
           def connect(addr:, timeout: nil)
-            # Can only connect once!
             [-1, Errno::EINVAL]
+          end
+
+          def disconnectx(timeout: nil)
+            [-1, Errno::ENOTCONN]
           end
 
           def listen(backlog:, timeout: nil)
@@ -72,8 +75,17 @@ class IO
             sendto(addr: nil, buffer: buffer, flags: flags, timeout: timeout)
           end
 
-          def sendto(addr:, buffer:, flags:, timeout: nil)
-            sendmsg(msghdr: nil, flags: flags, timeout: timeout)
+          def sendto(buffer:, nbytes:, flags:, addr:, addr_len:, timeout: nil)
+            reply = @backend.sendto(
+              fd: @fd,
+              buffer: buffer,
+              nbytes: nbytes,
+              flags: flags,
+              addr: addr,
+              addr_len: addr_len,
+              timeout: timeout
+            )
+            [reply[:rc], reply[:errno]]
           end
 
           def sendmsg(msghdr:, flags:, timeout: nil)
@@ -94,8 +106,26 @@ class IO
             [reply[:rc], reply[:errno], string]
           end
 
-          def recvfrom(addr:, buffer:, flags:, timeout: nil)
-            recvmsg(msghdr: nil, flags: flags, timeout: timeout)
+          def recvfrom(buffer:, nbytes:, flags:, addr:, addr_len:, timeout: nil)
+            read_buffer = buffer || ::FFI::MemoryPointer.new(nbytes)
+            reply = @backend.recvfrom(
+              fd: @fd,
+              buffer: read_buffer,
+              nbytes: nbytes,
+              flags: flags,
+              addr: addr,
+              addr_len: addr_len,
+              timeout: timeout
+            )
+
+            string = if reply[:rc] >= 0
+              # only return a string if user didn't pass in their own buffer
+              buffer ? nil : read_buffer.read_string
+            else
+              nil
+            end
+
+            [reply[:rc], reply[:errno], string, addr, addr_len]
           end
 
           def recvmsg(msghdr:, flags:, timeout: nil)

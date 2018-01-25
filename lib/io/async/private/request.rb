@@ -9,15 +9,13 @@ class IO
         # a block, so there's a possibility that this could be a minor
         # performance enhancement. Preliminary tests show now improvement
         # but we'll keep around this example for a later revisit.
-        class BaseBlocking
+        class BaseCommand
           attr_accessor :sequence_no
           attr_reader :fiber
           def initialize(fiber, **kwargs)
             @fiber = fiber
             @kwargs = kwargs
           end
-
-          def blocking?(); true; end
 
           def reply_to_mailbox(mailbox)
             @mailbox = mailbox
@@ -37,6 +35,14 @@ class IO
           def selector_update(poller:)
             # no op by default
           end
+        end
+
+        class BaseBlocking < BaseCommand
+          def blocking?(); true; end
+        end
+
+        class BaseNonblocking < BaseCommand
+          def blocking?(); false; end
         end
 
         class PRead < BaseBlocking
@@ -59,6 +65,34 @@ class IO
 
             # tell, don't ask
             poller.deregister(fd: @kwargs[:fd])
+          end
+        end
+
+        class Recvfrom < BaseNonblocking
+          def call
+            execute do |fd, buffer, nbytes, flags, addr, addr_len, timeout|
+              Platforms::Functions.recvfrom(fd, buffer, nbytes, flags, addr, addr_len)
+            end
+          end
+
+          def selector_update(poller:)
+            super
+
+            poller.register_read(fd: @kwargs[:fd], request: self)
+          end
+        end
+
+        class Sendto < BaseNonblocking
+          def call
+            execute do |fd, buffer, nbytes, flags, addr, addr_len, timeout|
+              Platforms::Functions.sendto(fd, buffer, nbytes, flags, addr, addr_len)
+            end
+          end
+
+          def selector_update(poller:)
+            super
+
+            poller.register_write(fd: @kwargs[:fd], request: self)
           end
         end
 
