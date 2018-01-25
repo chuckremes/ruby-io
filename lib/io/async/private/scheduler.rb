@@ -106,10 +106,11 @@ class IO
         end
 
         def post(request)
-          return unless request.is_a?(Request::Command) || request.is_a?(Request::BaseBlocking)
+          return unless command?(request)
 
           save_reference(request)
           save_reply_mailbox(request)
+          Logger.debug(klass: self.class, name: :post_request, message: "[#{tid}], posting request")
           @outbox.post(request)
         end
 
@@ -153,7 +154,7 @@ class IO
             setup_thread
             Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], into [#{fid}]")
 
-            if object.is_a?(Request::Command) || object.is_a?(Request::BaseBlocking)
+            if command?(object)
               Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off command request")
               post(object)
             elsif object.is_a?(Request::Fibers)
@@ -200,6 +201,10 @@ class IO
             block.call
             Logger.debug(klass: self.class, name: :make_runnable_from_proc, message: "[#{tid}], fiber exiting, see where we transfer to")
           end
+        end
+
+        def command?(request)
+          request.is_a?(Request::Command) || request.is_a?(Request::BaseCommand)
         end
 
         if RUBY_PLATFORM =~ /java/

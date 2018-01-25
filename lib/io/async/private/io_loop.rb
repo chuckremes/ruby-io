@@ -112,11 +112,13 @@ class IO
         end
 
         def dispatch_to_workers(request)
+          Logger.debug(klass: self.class, name: :dispatch_to_workers, message: 'dispatched blocking request, ' + request.inspect)
           request.selector_update(poller: @poller)
           @pool.dispatch(request)
         end
 
         def immediate_dispatch(request)
+          Logger.debug(klass: self.class, name: :immediate_dispatch, message: 'dispatched non-blocking request, ' + request.inspect)
           # register with event loop
           # probably need to save a reference to this request somewhere. index by
           # FD and sequence_no maybe?
