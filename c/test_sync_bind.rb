@@ -1,12 +1,14 @@
 $: << '../lib'
 require 'io'
 
+IO::Config::Defaults.configure_syscall_mode(mode: :blocking)
+
 port = '3490'
-structs = IO::Sync::TCP.getv4(hostname: 'localhost', service: port)
+structs = IO::TCP.getv4(hostname: 'localhost', service: port)
 
 p structs.size, structs
 
-server = IO::Sync::TCP.ip4(addrinfo: structs.first)
+server = IO::TCP.ip4(addrinfo: structs.first)
 addr = structs.first.sock_addr_ref
 
 p server

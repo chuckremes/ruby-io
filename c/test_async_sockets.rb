@@ -1,16 +1,18 @@
 $: << '../lib'
 require 'io'
 
+IO::Config::Defaults.configure_syscall_mode(mode: :nonblocking)
+
 start = Time.now
 
 port = '3490'
-structs = IO::Async::TCP.getv4(hostname: 'localhost', service: port)
+structs = IO::TCP.getv4(hostname: 'localhost', service: port)
 
 p structs.size, structs
 
 server_thr = Thread.new do
   puts "SERVER THREAD"
-  server = IO::Async::TCP.ip4(addrinfo: structs.first)
+  server = IO::TCP.ip4(addrinfo: structs.first)
   addr = structs.first.sock_addr_ref
   server.bind(addr: addr)
   server.listen(backlog: 5)
@@ -39,7 +41,7 @@ runflag = true
 
 client_thr = Thread.new do
   puts "CLIENT THREAD"
-  client = IO::Async::TCP.ip4(addrinfo: structs.first)
+  client = IO::TCP.ip4(addrinfo: structs.first)
   addr = structs.first.sock_addr_ref
   puts "CLIENT TRYING TO CONNECT"
   client.connect(addr: addr)

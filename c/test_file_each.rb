@@ -1,5 +1,6 @@
 $: << '../lib'
 require 'io'
+IO::Config::Defaults.configure_syscall_mode(mode: :blocking)
 
 string = '0123456789abcdefghij'
 string += '012'
@@ -8,7 +9,7 @@ flags = IO::Config::Flags.new
 # No need to make FD nonblocking for File writes. It's pointless. Get shunted
 # to worker thread. select/epoll/kqueue always signal that a block device is
 # ready for reads and writes.
-io = IO::Sync::File.open(path: '/tmp/t', flags: flags.create.readwrite.truncate)
+io = IO::File.open(path: '/tmp/t', flags: flags.create.readwrite.truncate)
 #io.extend(IO::Mixins::Enumerable)
 
 p io.write(string: string, offset: 0)
