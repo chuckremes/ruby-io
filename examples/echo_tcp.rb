@@ -1,6 +1,7 @@
 $: << '../lib'
 require 'io'
 
+IO::Config::Defaults.configure_syscall_mode(mode: :nonblocking)
 Thread.abort_on_exception = true
 DEBUG = false
 RAND_SLEEP = 10
@@ -13,13 +14,13 @@ end
 threads = []
 
 port = '3490'
-structs = IO::Async::TCP.getv4(hostname: 'localhost', service: port)
+structs = IO::TCP.getv4(hostname: 'localhost', service: port)
 Thread.current.local[:name] = 'MAIN' if DEBUG
 
 
 server_thread = IO::Internal::Thread.new do
   Thread.current.local[:name] = 'SERVER' if DEBUG
-  server = IO::Async::TCP.ip4(addrinfo: structs.first)
+  server = IO::TCP.ip4(addrinfo: structs.first)
   addr = structs.first.sock_addr_ref
   server.bind(addr: addr)
   server.listen(backlog: 5)
@@ -49,7 +50,7 @@ server_thread = IO::Internal::Thread.new do
           puts "SERVER: marking accept loop break"
           server.accept_break
         elsif server_wait
-          timer_reply = IO::Async::Timer.sleep(seconds: rand(RAND_SLEEP))
+          timer_reply = IO::Timer.sleep(seconds: rand(RAND_SLEEP))
           puts "Server echoing back: #{string}"
           rc, errno = socket.send(buffer: string, nbytes: string.size, flags: 0)
           server_sent += 1
@@ -83,7 +84,7 @@ client_thread = IO::Internal::Thread.new do
   start_connects = Time.now
   ClientCount.times do |i|
     top = Time.now
-    client = IO::Async::TCP.ip4(addrinfo: structs.first)
+    client = IO::TCP.ip4(addrinfo: structs.first)
     addr = structs.first.sock_addr_ref
     puts "#{tid}, CLIENT-#{i}, TRYING TO CONNECT" if DEBUG
     times[i] = Time.now
@@ -114,9 +115,9 @@ client_thread = IO::Internal::Thread.new do
     puts "times[#{i}] took: #{Time.now - times[i]} seconds"
   end
   puts "[#{Time.now - start_connects}] seconds to issue all #{ClientCount} connection requests."
-  IO::Async::Timer.sleep(seconds: 1) until completed_count >= ClientCount
+  IO::Timer.sleep(seconds: 1) until completed_count >= ClientCount
 
-  client = IO::Async::TCP.ip4(addrinfo: structs.first)
+  client = IO::TCP.ip4(addrinfo: structs.first)
   addr = structs.first.sock_addr_ref
   puts "LAST CLIENT TRYING TO CONNECT" if DEBUG
   can_exit = false
@@ -132,7 +133,7 @@ client_thread = IO::Internal::Thread.new do
     nil
   end
 
-  IO::Async::Timer.sleep(seconds: 1) until can_exit
+  IO::Timer.sleep(seconds: 1) until can_exit
 
   puts "finalizing client loop..."
   Thread.current.local[:_scheduler_].finalize_loop

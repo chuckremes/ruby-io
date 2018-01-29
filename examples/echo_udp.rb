@@ -1,6 +1,7 @@
 $: << '../lib'
 require 'io'
 
+IO::Config::Defaults.configure_syscall_mode(mode: :nonblocking)
 Thread.abort_on_exception = true
 DEBUG = false
 RAND_SLEEP = 10
@@ -13,13 +14,13 @@ end
 threads = []
 
 port = '3490'
-structs = IO::Async::UDP.getv4(hostname: 'localhost', service: port)
+structs = IO::UDP.getv4(hostname: 'localhost', service: port)
 Thread.current.local[:name] = 'MAIN' if DEBUG
 
 
 server_thread = IO::Internal::Thread.new do
   Thread.current.local[:name] = 'SERVER' if DEBUG
-  server = IO::Async::UDP.ip4(addrinfo: structs.first)
+  server = IO::UDP.ip4(addrinfo: structs.first)
   addr = structs.first.sock_addr_ref
   rc, errno = server.bind(addr: addr)
   raise "Server could not bind! rc [#{rc}], errno [#{errno}]" if rc < 0
@@ -47,7 +48,7 @@ server_thread = IO::Internal::Thread.new do
           puts "SERVER: breaking out of loop, rc [#{rc}], errno [#{errno}]"
           break
         elsif server_wait
-          #timer_reply = IO::Async::Timer.sleep(seconds: rand(RAND_SLEEP))
+          #timer_reply = IO::Timer.sleep(seconds: rand(RAND_SLEEP))
           puts "Server echoing back: #{string}"
           rc, errno = server.sendto(buffer: string, nbytes: string.size, flags: 0, addr: addr_buffer, addr_len: addr_len_buffer.read_uint32)
           server_sent += 1
@@ -82,7 +83,7 @@ client_thread = IO::Internal::Thread.new do
   start_connects = Time.now
   ClientCount.times do |i|
     top = Time.now
-    client = IO::Async::UDP.ip4(addrinfo: structs.first)
+    client = IO::UDP.ip4(addrinfo: structs.first)
     addr = structs.first.sock_addr_ref
     puts "#{tid}, CLIENT-#{i}, TRYING TO CONNECT, #{client.inspect}" if DEBUG
     times[i] = Time.now
@@ -113,9 +114,9 @@ client_thread = IO::Internal::Thread.new do
     puts "times[#{i}] took: #{Time.now - times[i]} seconds"
   end
   puts "[#{Time.now - start_connects}] seconds to issue all #{ClientCount} echo sends."
-  IO::Async::Timer.sleep(seconds: 1) until completed_count >= ClientCount - 1
+  IO::Timer.sleep(seconds: 1) until completed_count >= ClientCount - 1
 
-  client = IO::Async::UDP.ip4(addrinfo: structs.first)
+  client = IO::UDP.ip4(addrinfo: structs.first)
   addr = structs.first.sock_addr_ref
   puts "LAST CLIENT TRYING TO CONNECT" if DEBUG
   can_exit = false
@@ -131,7 +132,7 @@ client_thread = IO::Internal::Thread.new do
     nil
   end
 
-  IO::Async::Timer.sleep(seconds: 1) until can_exit
+  IO::Timer.sleep(seconds: 1) until can_exit
 
   puts "finalizing client loop..."
   Thread.current.local[:_scheduler_].finalize_loop
