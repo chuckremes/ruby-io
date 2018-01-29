@@ -25,6 +25,11 @@ require_relative 'io/internal/backend/multithread_policy'
 require_relative 'io/platforms/common_constants'
 require_relative 'io/platforms/common_ffi'
 require_relative 'io/platforms/functions'
+
+# temporary loading order to satisfy defaults
+require_relative 'io/internal/backend/async'
+require_relative 'io/internal/backend/sync'
+
 require_relative 'io/config/defaults'
 require_relative 'io/config/flags'
 require_relative 'io/config/mode'
@@ -32,19 +37,24 @@ require_relative 'io/config/mode'
 require_relative 'io/mixins/enumerable'
 
 # sync
-require_relative 'io/internal/backend/sync'
-require_relative 'io/sync/fcntl'
-require_relative 'io/sync/file'
-require_relative 'io/sync/tcp'
+#require_relative 'io/sync/fcntl'
+#require_relative 'io/sync/file'
+#require_relative 'io/sync/tcp'
 
 # async
-require_relative 'io/internal/backend/async'
+#require_relative 'io/async/timer'
+#require_relative 'io/async/fcntl'
+#require_relative 'io/async/file'
+#require_relative 'io/async/tcp'
+#require_relative 'io/async/udp'
+
+require 'io/fcntl'
+require 'io/file'
+require 'io/tcp'
+require 'io/timer'
+require 'io/udp'
+
 require_relative 'io/async/private/private'
-require_relative 'io/async/timer'
-require_relative 'io/async/fcntl'
-require_relative 'io/async/file'
-require_relative 'io/async/tcp'
-require_relative 'io/async/udp'
 
 # transcoder
 require_relative 'io/transcode/transcode'

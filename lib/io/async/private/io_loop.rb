@@ -143,14 +143,16 @@ class IO
           # fatal error if this allocation fails
           raise "Fatal error, self-pipe failed to allocate, rc [#{rc}] errno [#{FFI.errno}]" if rc < 0
           reader, writer = pipe_fds.read_array_of_int(2)
-          rc, errno = Sync::FCNTL.set_nonblocking(fd: reader)
-          raise "Fatal error, could not set reader to nonblocking, rc [#{rc}] errno [#{errno}]" if rc < 0
-          rc, errno = Sync::FCNTL.set_nonblocking(fd: writer)
-          raise "Fatal error, could not set writer to nonblocking, rc [#{rc}] errno [#{errno}]" if rc < 0
-          rc, errno = Sync::FCNTL.set_close_on_exec(fd: reader)
-          raise "Fatal error, could not set reader to close-on-exec, rc [#{rc}] errno [#{errno}]" if rc < 0
-          rc, errno = Sync::FCNTL.set_close_on_exec(fd: writer)
-          raise "Fatal error, could not set writer to close-on-exec, rc [#{rc}] errno [#{errno}]" if rc < 0
+          Config::Defaults.syscall_mode_switch(mode: :blocking) do
+            rc, errno = IO::FCNTL.set_nonblocking(fd: reader)
+            raise "Fatal error, could not set reader to nonblocking, rc [#{rc}] errno [#{errno}]" if rc < 0
+            rc, errno = IO::FCNTL.set_nonblocking(fd: writer)
+            raise "Fatal error, could not set writer to nonblocking, rc [#{rc}] errno [#{errno}]" if rc < 0
+            rc, errno = IO::FCNTL.set_close_on_exec(fd: reader)
+            raise "Fatal error, could not set reader to close-on-exec, rc [#{rc}] errno [#{errno}]" if rc < 0
+            rc, errno = IO::FCNTL.set_close_on_exec(fd: writer)
+            raise "Fatal error, could not set writer to close-on-exec, rc [#{rc}] errno [#{errno}]" if rc < 0
+          end
           Logger.debug(klass: self.class, name: 'IOLoop', message: "self-pipe, reader [#{reader}], writer [#{writer}]")
 
           [reader, writer]

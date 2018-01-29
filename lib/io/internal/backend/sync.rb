@@ -62,6 +62,16 @@ class IO
           def recv(fd:, buffer:, nbytes:, flags:, timeout:)
             Platforms::Functions.recv(fd, buffer, nbytes, flags)
           end
+
+          def setup
+            # no op
+          end
+
+          def schedule_fibers(originator:, spawned:)
+            Fiber.new do
+              spawned.call
+            end.resume
+          end
         end
       end
     end
