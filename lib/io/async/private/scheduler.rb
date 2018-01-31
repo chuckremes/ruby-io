@@ -47,12 +47,11 @@ class IO
           val
         end
 
-        def schedule_fibers(originator:, spawned:)
-          raise 'Argument must be a Fiber!' unless originator.is_a?(Fiber)
-          raise 'Spawned arg must be a Proc!' unless spawned.is_a?(Proc)
-          Logger.debug(klass: self.class, name: :schedule_fibers, message: "[#{tid}], from [#{fid}] to [#{@io_fiber.fid}] with spawn block")
-          val = enqueue(Request::Fibers.new(originator: originator, spawned: spawned))
-          raise "Value from #schedule_fibers should be nil but is non-nil! #{val.inspect}" if val
+        def schedule_block(originator:, block:)
+          raise '+block+ arg must be a Proc!' unless block.is_a?(Proc)
+          Logger.debug(klass: self.class, name: :schedule_block, message: "[#{tid}], from [#{fid}] to [#{@io_fiber.fid}] with spawn block")
+          val = enqueue(Request::Block.new(originator: originator, block: block))
+          raise "Value from #schedule_block should be nil but is non-nil! #{val.inspect}" if val
           val
         end
 
@@ -157,9 +156,9 @@ class IO
             if command?(object)
               Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off command request")
               post(object)
-            elsif object.is_a?(Request::Fibers)
+            elsif object.is_a?(Request::Block)
               Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off fiber")
-              add_runnable(object.spawned)
+              add_runnable(object.block)
               add_runnable(object.originator)
             elsif object.nil?
               Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off nil, ignore!")

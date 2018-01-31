@@ -196,12 +196,12 @@ class IO
           Deregister = Struct.new(:fiber_id)
         end
 
-        class Fibers
-          attr_reader :originator, :spawned
+        class Block
+          attr_reader :originator, :block
 
-          def initialize(originator:, spawned:)
+          def initialize(originator:, block:)
             @originator = originator
-            @spawned = spawned
+            @block = block
           end
         end
       end
