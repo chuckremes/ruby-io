@@ -18,6 +18,7 @@ This project exists to try out some ideas. I expect a few blind alleys before I 
 * Allow programmer to choose Error reporting policy; built-in choices to include POSIX-style return codes with errno, and Exceptions. One or the other will be active per IO instance.
 * Allow programmer to choose Multithread reporting policy for when using objects across multiple threads: silent, warn, fatal options
 * Move unicode support to the periphery of the IO classes and only incur unicode overhead when the programmer chooses to use it
+* Pure Ruby implementation; other runtimes could potentially load native code (C for MRI, Java for JRuby) if performance dictates.
 
 ## Runtime Support
 Tested and works on:
