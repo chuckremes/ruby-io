@@ -10,19 +10,17 @@ class IO
         Config::Defaults.syscall_backend.setup
         result = Config::Defaults.syscall_backend.socket(domain: domain, type: type, protocol: protocol, timeout: timeout)
 
-        if result[:rc] > 0
-          if Platforms::PF_INET == domain
-            TCP4.new(fd: result[:rc])
-          elsif Platforms::PF_INET6 == domain
-            TCP6.new(fd: result[:rc])
-          else
-            # Temporary raise... should respect the set Policy. If socket
-            # failed to open, return a TCP socket in the Closed state.
-            # TCP.new(fd: nil, state: :closed)
-            raise "Unknown Protocol Family [#{domain}] for TCP socket!"
-          end
+        raise "failed to allocate socket" if result[:rc] < 0
+
+        if Platforms::PF_INET == domain
+          TCP4.new(fd: result[:rc])
+        elsif Platforms::PF_INET6 == domain
+          TCP6.new(fd: result[:rc])
         else
-          raise "failed to allocate socket"
+          # Temporary raise... should respect the set Policy. If socket
+          # failed to open, return a TCP socket in the Closed state.
+          # TCP.new(fd: nil, state: :closed)
+          raise "Unknown Protocol Family [#{domain}] for TCP socket!"
         end
       end
 
@@ -69,7 +67,7 @@ class IO
 
         return structs if result[:rc] < 0 || ptr.nil?
 
-        begin
+        loop do
           # We don't own the memory containing the addrinfo structs, so we need to copy
           # these to our own memory
           addrinfo = Platforms::AddrInfoStruct.new(ptr)
@@ -83,7 +81,8 @@ class IO
           structs << Platforms::AddrInfoStruct.copy_to_new(addrinfo)
 
           ptr = addrinfo[:ai_next]
-        end while(ptr && !ptr.null?)
+          break if ptr.nil? || ptr.null?
+        end
         structs
       end
     end
@@ -93,23 +92,23 @@ class IO
       reply = FCNTL.set_nonblocking(fd: fd) # ignore return code?
       @accept_loop = nil
 
-      @context = if :open == state
-        Internal::States::Socket::Open.new(
-          fd: fd,
-          backend: Config::Defaults.syscall_backend,
-          parent: self
-        )
-      elsif :connected == state
-        Internal::States::Socket::Connected.new(
-          fd: fd,
-          backend: Config::Defaults.syscall_backend
-        )
-      else
-        Internal::States::Socket::Closed.new(
-          fd: -1,
-          backend: Config::Defaults.syscall_backend
-        )
-      end
+      @context = if state == :open
+                   Internal::States::Socket::Open.new(
+                     fd: fd,
+                     backend: Config::Defaults.syscall_backend,
+                     parent: self
+                   )
+                 elsif state == :connected
+                   Internal::States::Socket::Connected.new(
+                     fd: fd,
+                     backend: Config::Defaults.syscall_backend
+                   )
+                 else
+                   Internal::States::Socket::Closed.new(
+                     fd: -1,
+                     backend: Config::Defaults.syscall_backend
+                   )
+                 end
     end
 
     def close(timeout: nil)
@@ -234,9 +233,7 @@ class IO
 
     def safe_delegation
       Config::Defaults.syscall_backend.setup
-      if Config::Defaults.multithread_policy.check(io: self, creator: @creator)
-        yield @context
-      end
+      yield(@context) if Config::Defaults.multithread_policy.check(io: self, creator: @creator)
     end
 
     def update_context(behavior)
@@ -276,10 +273,14 @@ class IO
   end
 
   class TCP4 < TCP
-    def protocol_version() '4'; end
+    def protocol_version
+      '4'
+    end
   end
 
   class TCP6 < TCP
-    def protocol_version() '6'; end
+    def protocol_version
+      '6'
+    end
   end
 end

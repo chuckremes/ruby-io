@@ -4,24 +4,20 @@ class IO
       DEFAULT_SYSCALL_MODE = :nonblocking
       @syscall_mode = DEFAULT_SYSCALL_MODE
       @syscall_backend = nil
-      SYSCALL_MODES = [:blocking, :nonblocking]
-      
-      def self.syscall_mode
-        @syscall_mode
+      SYSCALL_MODES = [:blocking, :nonblocking].freeze
+
+      class << self
+        attr_reader :syscall_mode, :syscall_backend
       end
 
-      def self.syscall_backend
-        @syscall_backend
-      end
-      
       def self.configure_syscall_mode(mode: DEFAULT_SYSCALL_MODE)
         return [-2, nil] unless SYSCALL_MODES.include?(mode)
 
-        @syscall_backend = if :blocking == mode
-          Internal::Backend::Sync
-        else
-          Internal::Backend::Async
-        end
+        @syscall_backend = if mode == :blocking
+                             Internal::Backend::Sync
+                           else
+                             Internal::Backend::Async
+                           end
 
         @syscall_mode = mode
 

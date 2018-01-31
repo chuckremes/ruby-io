@@ -13,18 +13,16 @@ class IO
         mode = Config::Mode.from_flags(flags)
         result = Config::Defaults.syscall_backend.open(path: path, flags: flags.to_i, mode: mode.to_i, timeout: timeout)
 
-        if result[:rc] > 0
-          if flags.readwrite?
-            File.new(fd: result[:rc], flags: flags, mode: mode, state: :readwrite, error_policy: error_policy)
-          elsif flags.readonly?
-            File.new(fd: result[:rc], flags: flags, mode: mode, state: :readonly, error_policy: error_policy)
-          elsif flags.writeonly?
-            File.new(fd: result[:rc], flags: flags, mode: mode, state: :writeonly, error_policy: error_policy)
-          else
-            raise "Unknown file mode!!!"
-          end
+        raise "could not allocate file instance" if result[:rc] < 0
+
+        if flags.readwrite?
+          File.new(fd: result[:rc], flags: flags, mode: mode, state: :readwrite, error_policy: error_policy)
+        elsif flags.readonly?
+          File.new(fd: result[:rc], flags: flags, mode: mode, state: :readonly, error_policy: error_policy)
+        elsif flags.writeonly?
+          File.new(fd: result[:rc], flags: flags, mode: mode, state: :writeonly, error_policy: error_policy)
         else
-          nil
+          raise "Unknown file mode!!!"
         end
       end
     end
@@ -35,35 +33,33 @@ class IO
       @policy = error_policy || Config::Defaults.error_policy
       read_cache = Internal::PReadCache.new(io: self, size: Config::Defaults.read_cache_size)
 
-      @context = if :readonly == state
-        Internal::States::File::ReadOnly.new(
-          fd: fd,
-          backend: Config::Defaults.syscall_backend,
-          read_cache: read_cache
-        )
-      elsif :writeonly == state
-        Internal::States::File::WriteOnly.new(
-          fd: fd,
-          backend: Config::Defaults.syscall_backend
-        )
-      elsif :readwrite == state
-        Internal::States::File::ReadWrite.new(
-          fd: fd,
-          backend: Config::Defaults.syscall_backend,
-          read_cache: read_cache
-        )
-      else
-        Internal::States::File::Closed.new(
-          fd: -1,
-          backend: Config::Defaults.syscall_backend
-        )
-      end
+      @context = if state == :readonly
+                   Internal::States::File::ReadOnly.new(
+                     fd: fd,
+                     backend: Config::Defaults.syscall_backend,
+                     read_cache: read_cache
+                   )
+                 elsif state == :writeonly
+                   Internal::States::File::WriteOnly.new(
+                     fd: fd,
+                     backend: Config::Defaults.syscall_backend
+                   )
+                 elsif state == :readwrite
+                   Internal::States::File::ReadWrite.new(
+                     fd: fd,
+                     backend: Config::Defaults.syscall_backend,
+                     read_cache: read_cache
+                   )
+                 else
+                   Internal::States::File::Closed.new(
+                     fd: -1,
+                     backend: Config::Defaults.syscall_backend
+                   )
+                 end
     end
 
     def to_i
-      safe_delegation do |context|
-        context.to_i
-      end
+      safe_delegation(&:to_i)
     end
 
     def close(timeout: nil)
@@ -130,9 +126,7 @@ class IO
       # thread means that it might not have the same async setup performed yet, so
       # any instance method must check first and perform setup.
       Config::Defaults.syscall_backend.setup
-      if Config::Defaults.multithread_policy.check(io: self, creator: @creator)
-        yield @context
-      end
+      yield(@context) if Config::Defaults.multithread_policy.check(io: self, creator: @creator)
     end
 
     def update_context(behavior)

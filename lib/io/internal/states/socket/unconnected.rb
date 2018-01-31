@@ -14,16 +14,14 @@ class IO
             errno = results[:errno]
             if rc.zero? || Errno::EBADF::Errno == errno
               [0, nil, Closed.new(fd: -1, backend: @backend)]
+            elsif Errno::EINTR == rc
+              [-1, nil, self]
+            elsif Errno::EIO == rc
+              [-1, nil, self]
             else
-              if Errno::EINTR == rc
-                [-1, nil, self]
-              elsif Errno::EIO == rc
-                [-1, nil, self]
-              else
-                # We have encountered a bug; fail hard regardless of Policy
-                STDERR.puts "Fatal error: close(2) returned code [#{rc}] and errno [#{errno}] which is an exceptional unhandled case"
-                exit!(123)
-              end
+              # We have encountered a bug; fail hard regardless of Policy
+              STDERR.puts "Fatal error: close(2) returned code [#{rc}] and errno [#{errno}] which is an exceptional unhandled case"
+              exit!(123)
             end
           end
 
@@ -80,11 +78,9 @@ class IO
             reply = @backend.recv(fd: @fd, buffer: read_buffer, nbytes: nbytes, flags: flags, timeout: timeout)
 
             string = if reply[:rc] >= 0
-              # only return a string if user didn't pass in their own buffer
-              buffer ? nil : read_buffer.read_string
-            else
-              nil
-            end
+                       # only return a string if user didn't pass in their own buffer
+                       buffer ? nil : read_buffer.read_string
+                     end
 
             [reply[:rc], reply[:errno], string]
           end
@@ -102,11 +98,9 @@ class IO
             )
 
             string = if reply[:rc] >= 0
-              # only return a string if user didn't pass in their own buffer
-              buffer ? nil : read_buffer.read_string
-            else
-              nil
-            end
+                       # only return a string if user didn't pass in their own buffer
+                       buffer ? nil : read_buffer.read_string
+                     end
 
             [reply[:rc], reply[:errno], string, addr, addr_len]
           end

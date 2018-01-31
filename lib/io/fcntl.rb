@@ -18,11 +18,8 @@ class IO
       def set_fd_flag(fd:, flag:, timeout: nil)
         rc, errno = get_status_flags(fd: fd, timeout: timeout)
 
-        if rc < 0
-          return [rc, errno]
-        elsif (rc & flag) == 0
-          return [0, nil]
-        end
+        return [rc, errno] if rc < 0
+        return [0, nil] if (rc & flag).zero?
 
         current_flags = rc | flag
         fcntl(fd: fd, cmd: Constants::F_SETFD, args: current_flags.to_i, timeout: timeout)
@@ -35,11 +32,8 @@ class IO
       def set_status_flag(fd:, flag:, timeout: nil)
         rc, errno = get_status_flags(fd: fd, timeout: timeout)
 
-        if rc < 0
-          return [rc, errno]
-        elsif (rc & flag) == 0
-          return [0, nil]
-        end
+        return [rc, errno] if rc < 0
+        return [0, nil] if (rc & flag).zero?
 
         current_flags = rc | flag
         fcntl(fd: fd, cmd: Constants::F_SETFL, args: current_flags.to_i, timeout: timeout)
@@ -48,11 +42,8 @@ class IO
       def clear_status_flag(fd:, flag:, timeout: nil)
         rc, errno = get_status_flags(fd: fd, timeout: timeout)
 
-        if rc < 0
-          return [rc, errno]
-        elsif (reply[:rc] & flag) == 0
-          return [0, nil]
-        end
+        return [rc, errno] if rc < 0
+        return [0, nil] if (rc & flag).zero?
 
         current_flags = rc & ~flag
         fcntl(fd: fd, cmd: Constants::F_SETFL, args: current_flags.to_i, timeout: timeout)
