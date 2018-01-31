@@ -1,17 +1,20 @@
 # ruby-io
-A clean sheet redesign of Ruby's IO class. Includes Synchronous and Asynchronous implementations of all major components.
+A clean sheet redesign of Ruby's IO class. Includes Blocking and Nonblocking implementations of all major components.
 
 This project exists to try out some ideas. I expect a few blind alleys before I settle on the API that I like and a good implementation to back it.
 
 # Goals
 * Be considered as the new core IO classes for Ruby 3.0
-* Provide Synchronous IO with a modern API for best single-threaded straight line performance
-* Provide Asynchronous / Nonblocking IO with a modern API for the best multi-threaded performance
+* New API
+  * Provide Synchronous IO with a modern API for best single-threaded straight line performance
+  * Provide Asynchronous / Nonblocking IO with a modern API for the best multi-threaded performance
+  * Make both the blocking & nonblocking APIs consistent/identical. Switching between them shouldn't require any (?) code changes.
 * Implement the State pattern internally to simplify error handling and eliminate a lot of hairy if/then/else logic
 * Utilize keyword arguments everywhere to simplify and clarify method signatures
 * Allow for the new IO classes to live side-by-side with the core IO classes in Ruby (no namespace conflicts)
 * New classes include a sane class inheritance and composition structure
 * Only expose POSIX-compliant functions
+  * Syscalls that are platform-specific can be sideloaded via mixins or some other mechanism
 * Allow programmer to choose Error reporting policy; built-in choices to include POSIX-style return codes with errno, and Exceptions. One or the other will be active per IO instance.
 * Allow programmer to choose Multithread reporting policy for when using objects across multiple threads: silent, warn, fatal options
 * Move unicode support to the periphery of the IO classes and only incur unicode overhead when the programmer chooses to use it
@@ -31,11 +34,6 @@ Tested and working on:
 
 ## Philosophy
 Please refer to the [FAQ](FAQ.md) for this topic.
-
-### Error Policy
-
-### Load Only Necessary Pieces
-IO libraries can be large and complicated. For resource-constrained systems, a library should be divisible so that only necessary components are loaded. For example, if a program will only utilize `IO::Sync` classes, then it should be allowed to ignore loading all of the `IO::Async` classes, or vice versa.
 
 ### Examples
 
