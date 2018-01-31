@@ -127,24 +127,17 @@ class IO
       end
     end
 
-    def connect(addr:, timeout: nil)
+    def connect(addr:, timeout: nil, &blk)
       rc, errno = safe_delegation do |context|
         rc, errno, behavior = context.connect(addr: addr, timeout: timeout)
         update_context(behavior)
         [rc, errno]
       end
       if block_given?
-        io = self
-        block = Proc.new do
-          begin
-            yield(io, rc, errno)
-          ensure
-            close
-          end
-        end
+        block = make_connect_block(self, rc, errno, &blk)
 
         # mark current fiber as ready to do more work
-        value = Config::Defaults.syscall_backend.schedule_fibers(originator: Fiber.current, spawned: block)
+        value = Config::Defaults.syscall_backend.schedule_block(originator: Fiber.current, block: block)
 
         # when transferred back to this fiber, +value+ should be nil
         raise "transferred back to #connect fiber, but came with non-nil info [#{value.inspect}]" if value
@@ -160,7 +153,7 @@ class IO
       end
     end
 
-    def accept(timeout: nil)
+    def accept(timeout: nil, &blk)
       if block_given? && @accept_loop.nil?
         @accept_loop = true
         # when #accept gets a block, loop forever accepting connections
@@ -173,16 +166,10 @@ class IO
               [rc, errno, address, socket]
             end
 
-            block = Proc.new do
-              begin
-                yield(address, socket, rc, errno)
-              ensure
-                socket.close if socket.respond_to?(:close)
-              end
-            end
+            block = make_accept_block(address, socket, rc, errno, &blk)
 
             # Schedule block above to be run
-            Config::Defaults.syscall_backend.schedule_fibers(originator: Fiber.current, spawned: block)
+            Config::Defaults.syscall_backend.schedule_block(originator: Fiber.current, block: block)
           end
         end
         @accept_loop = nil
@@ -254,6 +241,37 @@ class IO
 
     def update_context(behavior)
       @context = behavior
+    end
+
+    # Wrap the block passed to #accept in its own Proc. Capture
+    # the +address+, +socket+, +rc+, and +errno+ arguments from
+    # the local scope so we can pass them to the original block.
+    #
+    # Moved to its own method so the closure capture is cleaner.
+    # Had a very difficult bug (impossible to repro in a simplified
+    # manner) on MRI where the wrapped block would suspend in its
+    # own fiber and then be resumed by *another fiber* and close
+    # the socket. The original fiber would then resume in the
+    # future and the socket was already closed. Very odd. Moving
+    # Proc creation to its own method solved the issue.
+    def make_accept_block(address, socket, rc, errno)
+      lambda do
+        begin
+          yield(address, socket, rc, errno)
+        ensure
+          socket.close if socket.respond_to?(:close)
+        end
+      end
+    end
+
+    def make_connect_block(socket, rc, errno)
+      lambda do
+        begin
+          yield(socket, rc, errno)
+        ensure
+          socket.close
+        end
+      end
     end
   end
 

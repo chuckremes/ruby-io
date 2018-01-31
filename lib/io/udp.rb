@@ -145,7 +145,7 @@ class IO
         end
 
         # mark current fiber as ready to do more work
-        value = Config::Defaults.syscall_backend.schedule_fibers(originator: Fiber.current, spawned: block)
+        value = Config::Defaults.syscall_backend.schedule_block(originator: Fiber.current, block: block)
 
         # when transferred back to this fiber, +value+ should be nil
         raise "transferred back to #connect fiber, but came with non-nil info [#{value.inspect}]" if value
