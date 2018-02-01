@@ -90,7 +90,6 @@ class IO
     def initialize(fd:, state: :open, error_policy: nil)
       @creator = Thread.current
       reply = FCNTL.set_nonblocking(fd: fd) # ignore return code?
-      @accept_loop = nil
 
       @context = if state == :open
                    Internal::States::Socket::Open.new(
@@ -153,11 +152,14 @@ class IO
     end
 
     def accept(timeout: nil, &blk)
-      if block_given? && @accept_loop.nil?
-        @accept_loop = true
+      if block_given?
         # when #accept gets a block, loop forever accepting connections
-        # this won't work until I get +timeout+ hooked up and functional.
-        while @accept_loop
+        # No easy way to break out of this loop; one thought is to expose
+        # the "hidden" Promise attached to the accept syscall from this
+        # instance and let a method like #break_accept call #cancel
+        # or #fulfill on that Promise. Promise could then cause a break
+        # to be called to end the loop.
+        loop do
           begin
             start_call = Time.now
             rc, errno, address, socket = safe_delegation do |context|
@@ -171,7 +173,6 @@ class IO
             Config::Defaults.syscall_backend.schedule_block(originator: Fiber.current, block: block)
           end
         end
-        @accept_loop = nil
       else
         rc, errno, address, socket = safe_delegation do |context|
           rc, errno, address, socket = context.accept(timeout: timeout)
@@ -254,9 +255,14 @@ class IO
     def make_accept_block(address, socket, rc, errno)
       lambda do
         begin
-          yield(address, socket, rc, errno)
+          val = yield(address, socket, rc, errno)
+          val
+        rescue => e
+          STDERR.puts "ACCEPT_BLOCK EXCEPTION! #{e.inspect}, #{e.backtrace.inspect}"
+          raise
         ensure
-          socket.close if socket.respond_to?(:close)
+          # socket may have failed to allocate so it could be nil
+          socket.close if socket
         end
       end
     end
@@ -264,7 +270,13 @@ class IO
     def make_connect_block(socket, rc, errno)
       lambda do
         begin
-          yield(socket, rc, errno)
+          val = yield(socket, rc, errno)
+          val
+        rescue => e
+          STDERR.puts "CONNECT_BLOCK EXCEPTION! #{e.inspect}, #{e.backtrace.inspect}"
+          # TODO fix... does not propogate up... the ensure block is likely also raising
+          # the same exception, so the fiber does not exit and the program hangs.
+          #raise
         ensure
           socket.close
         end
