@@ -26,7 +26,17 @@ class IO
           # communicated via a Promise directly back to the calling Fiber
           # Scheduler that originated request.
           Logger.debug(klass: self.class, name: :process, message: "executing command in pool thread-#{index}")
-          request.call
+          value, secs = elapsed { request.call }
+          Logger.debug(klass: self.class, name: :process, message: "executed command in pool thread-#{index}")
+          Logger.debug(klass: self.class, name: :process, message: "[#{secs}] secs for execution in pool thread-#{index}")
+          value
+        end
+
+        def elapsed
+          start = Time.now
+          value = yield
+          secs = Time.now - start
+          [value, secs]
         end
       end
     end
