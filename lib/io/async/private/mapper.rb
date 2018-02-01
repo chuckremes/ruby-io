@@ -12,10 +12,14 @@ class IO
       # to it.
       class Mapper
         extend Forwardable
-        def_delegators :@storage, :[], :[]=, :key?
+        def_delegators :@storage, :[], :[]=, :key?, :delete
 
         def initialize
           @storage = {}
+        end
+
+        def inspect
+          @storage.inspect
         end
       end
     end
