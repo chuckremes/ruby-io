@@ -15,7 +15,7 @@ class IO
 
         raise "could not allocate file instance" if result[:rc] < 0
 
-        if flags.readwrite?
+        file = if flags.readwrite?
           File.new(fd: result[:rc], flags: flags, mode: mode, state: :readwrite, error_policy: error_policy)
         elsif flags.readonly?
           File.new(fd: result[:rc], flags: flags, mode: mode, state: :readonly, error_policy: error_policy)
@@ -24,6 +24,8 @@ class IO
         else
           raise "Unknown file mode!!!"
         end
+
+        block_given? ? yield(file) : file
       end
     end
 
