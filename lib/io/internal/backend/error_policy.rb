@@ -5,6 +5,8 @@ class IO
 
         class ReturnCodes
           def self.check(reply)
+            return reply
+            # TODO none of this works below...
             return reply if reply[:_return_code_].zero?
 
             # Got an error. Build a ReturnCodeError, populate it,
