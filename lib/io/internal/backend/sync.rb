@@ -67,10 +67,11 @@ class IO
             # no op
           end
 
-          def schedule_fibers(originator:, spawned:)
-            Fiber.new do
-              spawned.call
-            end.resume
+          def schedule_block(originator:, block:)
+            f = Fiber.new do
+              block.call
+            end
+            f.resume
           end
         end
       end
