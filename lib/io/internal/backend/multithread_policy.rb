@@ -3,7 +3,7 @@ class IO
     module Backend
       module MultithreadPolicy
         class Silent
-          def self.check(io:, creator:, current:)
+          def self.check(io:, creator:, current: nil)
             true
           end
         end
