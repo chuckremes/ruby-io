@@ -238,7 +238,7 @@ class IO
       def allocate_addr_buffer
         addr_buffer = Platforms::SockAddrInStruct.new
         addr_len = ::FFI::MemoryPointer.new(:socklen_t)
-        addr_len.write_uint32(addr_buffer.size)
+        addr_len.write_int32(addr_buffer.size)
         [addr_buffer, addr_len]
       end
     end
@@ -253,7 +253,7 @@ class IO
       def allocate_addr_buffer
         addr_buffer = Platforms::SockAddrIn6Struct.new
         addr_len = ::FFI::MemoryPointer.new(:socklen_t)
-        addr_len.write_uint32(addr_buffer.size)
+        addr_len.write_int32(addr_buffer.size)
         [addr_buffer, addr_len]
       end
     end
