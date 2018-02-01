@@ -10,11 +10,17 @@ class IO
         # performance enhancement. Preliminary tests show now improvement
         # but we'll keep around this example for a later revisit.
         class BaseCommand
-          attr_accessor :sequence_no
+          attr_reader :sequence_no
           attr_reader :fiber
           def initialize(fiber, **kwargs)
             @fiber = fiber
             @kwargs = kwargs
+            @creation = Time.now
+            @klass_name = self.class.to_s.downcase.split('::').last
+          end
+
+          def sequence_no=(val)
+            @sequence_no = "#{@klass_name}-#{@fiber.hash}-#{val}"
           end
 
           def reply_to_mailbox(mailbox)
@@ -26,9 +32,15 @@ class IO
           end
 
           def execute
+            executing = Time.now
+            secs = executing - @creation
+            Logger.debug(klass: self.class, name: 'execute', message: "[#{secs}] phase 1, seq [#{sequence_no}]")
             results = yield(@kwargs.values)
 
+            secs = Time.now - executing
+            Logger.debug(klass: self.class, name: 'execute', message: "[#{secs}] phase 2, seq [#{sequence_no}]")
             results[:fiber] = @fiber
+            results[:_sequence_no_] = sequence_no
             @promise.fulfill(results)
           end
 
@@ -53,6 +65,14 @@ class IO
           end
         end
 
+        class Read < BaseBlocking
+          def call
+            execute do |fd, buffer, nbytes, timeout|
+              Platforms::Functions.read(fd, buffer, nbytes)
+            end
+          end
+        end
+
         class Close < BaseBlocking
           def call
             execute do |fd, timeout|
@@ -65,6 +85,111 @@ class IO
 
             # tell, don't ask
             poller.deregister(fd: @kwargs[:fd])
+          end
+        end
+
+        class Open < BaseBlocking
+          def call
+            execute do |path, flags, mode, timeout|
+              Platforms::Functions.open(path, flags.to_i, mode.to_i)
+            end
+          end
+        end
+
+        class Socket < BaseBlocking
+          def call
+            execute do |domain, type, protocol, timeout|
+              Platforms::Functions.socket(domain, type, protocol)
+            end
+          end
+        end
+
+        class Getaddrinfo < BaseBlocking
+          def call
+            execute do |hostname, service, hints, results, timeout|
+              Platforms::Functions.getaddrinfo(hostname, service, hints, results)
+            end
+          end
+        end
+
+        class Getsockopt < BaseBlocking
+          def call
+            execute do |fd, level, option_name, value, length, timeout|
+              Platforms::Functions.getsockopt(fd, level, option_name, value, length)
+            end
+          end
+        end
+
+        class Fcntl < BaseBlocking
+          def call
+            execute do |fd, cmd, args, timeout|
+              Platforms::Functions.fcntl(fd, cmd, args)
+            end
+          end
+        end
+
+        class Bind < BaseBlocking
+          def call
+            execute do |fd, addr, addrlen, timeout|
+              Platforms::Functions.bind(fd, addr, addrlen)
+            end
+          end
+        end
+
+        class Listen < BaseBlocking
+          def call
+            execute do |fd, backlog, timeout|
+              Platforms::Functions.listen(fd, backlog)
+            end
+          end
+        end
+
+        class Accept < BaseNonblocking
+          def call
+            execute do |fd, addr, addrlen, timeout|
+              Platforms::Functions.accept(fd, addr, addrlen)
+            end
+          end
+
+          def selector_update(poller:)
+            super
+
+            poller.register_read(fd: @kwargs[:fd], request: self)
+          end
+        end
+
+        class Connect < BaseNonblocking
+          def call
+            execute do |fd, timeout|
+              # When doing a nonblocking connect, we are just waiting for
+              # the fd to become writeable. The syscall was already made
+              # so another one would just raise an error to no purpose.
+              # Could just pass back nil, but I like this so it shows
+              # in the log when running in debug mode.
+              {
+                writeable: true
+              }
+            end
+          end
+
+          def selector_update(poller:)
+            super
+
+            poller.register_write(fd: @kwargs[:fd], request: self)
+          end
+        end
+
+        class Recv < BaseNonblocking
+          def call
+            execute do |fd, buffer, nbytes, flags, timeout|
+              Platforms::Functions.recv(fd, buffer, nbytes, flags)
+            end
+          end
+
+          def selector_update(poller:)
+            super
+
+            poller.register_read(fd: @kwargs[:fd], request: self)
           end
         end
 
@@ -82,6 +207,48 @@ class IO
           end
         end
 
+        class Write < BaseNonblocking
+          def call
+            execute do |fd, buffer, nbytes, timeout|
+              Platforms::Functions.write(fd, buffer, nbytes)
+            end
+          end
+
+          def selector_update(poller:)
+            super
+
+            poller.register_write(fd: @kwargs[:fd], request: self)
+          end
+        end
+
+        class PWrite < BaseNonblocking
+          def call
+            execute do |fd, buffer, nbytes, offset, timeout|
+              Platforms::Functions.pwrite(fd, buffer, nbytes, offset)
+            end
+          end
+
+          def selector_update(poller:)
+            super
+
+            poller.register_write(fd: @kwargs[:fd], request: self)
+          end
+        end
+
+        class Send < BaseNonblocking
+          def call
+            execute do |fd, buffer, nbytes, flags, timeout|
+              Platforms::Functions.send(fd, buffer, nbytes, flags)
+            end
+          end
+
+          def selector_update(poller:)
+            super
+
+            poller.register_write(fd: @kwargs[:fd], request: self)
+          end
+        end
+
         class Sendto < BaseNonblocking
           def call
             execute do |fd, buffer, nbytes, flags, addr, addr_len, timeout|
@@ -96,6 +263,26 @@ class IO
           end
         end
 
+        class Timer < BaseNonblocking
+          def call
+            execute do |duration|
+              duration = duration.first / 1_000.0
+              {
+                actual_duration: (Time.now.to_f - @creation.to_f),
+                duration: duration
+              }
+            end
+          end
+
+          def selector_update(poller:)
+            super
+
+            poller.register_timer(duration: @kwargs[:duration], request: self)
+          end
+        end
+
+        # Deprecated in favor of the BaseCommand structure and its subclasses.
+        # Keep around until clear we don't need this any more and then delete.
         class Command
           attr_accessor :sequence_no
           attr_reader :fiber
