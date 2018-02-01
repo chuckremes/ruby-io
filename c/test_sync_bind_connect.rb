@@ -18,11 +18,10 @@ client = IO::TCP.ip4(addrinfo: structs.first)
 p client
 p client.connect(addr: addr)
 
-server.accept do |address, socket, fd, errno|
-  puts "ACCEPTED A SOCKET, rc [#{fd}]"
-  p address, socket, fd, errno
-  socket.close
-end
+address, socket, fd, errno = server.accept
+puts "ACCEPTED A SOCKET, rc [#{fd}]"
+p address, socket, fd, errno
+socket.close
 
 IO.popen("netstat -an | grep #{port}") do |io|
   while line = io.gets
