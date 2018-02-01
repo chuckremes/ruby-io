@@ -5,13 +5,27 @@ DEBUG = false
 
 class IO
   class Logger
-    def self.debug(klass:, name:, message:)
-      return unless DEBUG
-      thr_id = Thread.current.object_id
-      string = "[#{thr_id}], #{klass}##{name}, #{message}"
+    def self.debug(klass:, name:, message:, force: false)
+      return unless DEBUG || force
+      thr_id = Thread.current.hash
+      fib_id = Fiber.current.hash
+      time = formatted_time
+      string = "[#{time}] | [#{thr_id} / #{fib_id}], #{klass}##{name}, #{message}"
       STDERR.puts(string)
     end
+
+    def self.formatted_time
+      Time.now.strftime "%Y-%m-%dT%H:%M:%S.%3N"
+    end
   end
+end
+
+def elapsed(str)
+  start = Time.now
+  value = yield
+  secs = Time.now - start
+  puts "#{str}: [#{secs}] to finish."
+  value
 end
 
 # shared
