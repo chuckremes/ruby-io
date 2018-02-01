@@ -71,7 +71,7 @@ class IO
         # given +timer+.
         #
         def cancel(timer)
-          @timers.delete?(timer)
+          @timers.delete(timer)
         end
 
         # A convenience method that loops through all known timers
@@ -114,7 +114,7 @@ class IO
         private
 
         def add timer
-          @timers.add(timer)
+          @timers << timer
         end
       end # class Timers
 
