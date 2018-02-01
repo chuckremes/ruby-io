@@ -27,7 +27,7 @@ class IO
         def fulfill(reply)
           Logger.debug(klass: self.class, name: :fulfill, message: "reply #{reply.inspect}")
           if @cas.compare_and_set(true, false)
-            Logger.debug(klass: self.class, name: :fulfill, message: 'posting reply')
+            Logger.debug(klass: self.class, name: :fulfill, message: "posting reply, seqno [#{reply[:_sequence_no_]}]")
             # We only get here if we are the first to set new value
             # Post reply directly to originating Fiber Scheduler's mailbox
             @mailbox.post(reply)
