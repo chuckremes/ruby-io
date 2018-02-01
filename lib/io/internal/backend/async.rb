@@ -6,19 +6,25 @@ class IO
       class Async
         class << self
           def fcntl(fd:, cmd:, args:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.fcntl(fd, cmd, args)
-              end
-            end
+            request = IO::Async::Private::Request::Fcntl.new(
+              Fiber.current,
+              fd: fd,
+              cmd: cmd,
+              args: args,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def open(path:, flags:, mode:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.open(path, flags.to_i, mode.to_i)
-              end
-            end
+            request = IO::Async::Private::Request::Open.new(
+              Fiber.current,
+              path: path,
+              flags: flags,
+              mode: mode,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def close(fd:, timeout:)
@@ -28,28 +34,28 @@ class IO
               timeout: timeout
             )
             reply = enqueue(request)
-
-            #            build_blocking_request do |fiber|
-            #              build_command(fiber) do
-            #                Platforms::Functions.close(fd)
-            #              end
-            #            end
           end
 
           def read(fd:, buffer:, nbytes:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.read(fd, buffer, nbytes)
-              end
-            end
+            request = IO::Async::Private::Request::Read.new(
+              Fiber.current,
+              fd: fd,
+              buffer: buffer,
+              nbytes: nbytes,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def write(fd:, buffer:, nbytes:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.write(fd, buffer, nbytes)
-              end
-            end
+            request = IO::Async::Private::Request::Write.new(
+              Fiber.current,
+              fd: fd,
+              buffer: buffer,
+              nbytes: nbytes,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def pread(fd:, buffer:, nbytes:, offset:, timeout:)
@@ -62,19 +68,18 @@ class IO
               timeout: timeout
             )
             reply = enqueue(request)
-            #            build_blocking_request do |fiber|
-            #              build_command(fiber) do
-            #                Platforms::Functions.pread(fd, buffer, nbytes, offset)
-            #              end
-            #            end
           end
 
           def pwrite(fd:, buffer:, nbytes:, offset:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.pwrite(fd, buffer, nbytes, offset)
-              end
-            end
+            request = IO::Async::Private::Request::PWrite.new(
+              Fiber.current,
+              fd: fd,
+              buffer: buffer,
+              nbytes: nbytes,
+              offset: offset,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def getaddrinfo(hostname:, service:, hints:, results:, timeout:)
@@ -83,30 +88,50 @@ class IO
                 Platforms::Functions.getaddrinfo(hostname, service, hints, results)
               end
             end
+#            request = IO::Async::Private::Request::Getaddrinfo.new(
+#              Fiber.current,
+#              hostname: hostname,
+#              service: service,
+#              hints: hints,
+#              results: results,
+#              timeout: timeout
+#            )
+#            reply = enqueue(request)
           end
 
           def socket(domain:, type:, protocol:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.socket(domain, type, protocol)
-              end
-            end
+            request = IO::Async::Private::Request::Socket.new(
+              Fiber.current,
+              domain: domain,
+              type: type,
+              protocol: protocol,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def getsockopt(fd:, level:, option_name:, value:, length:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.getsockopt(fd, level, option_name, value, length)
-              end
-            end
+            request = IO::Async::Private::Request::Getsockopt.new(
+              Fiber.current,
+              fd: fd,
+              level: level,
+              option_name: option_name,
+              value: value,
+              length: length,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def bind(fd:, addr:, addrlen:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.bind(fd, addr, addrlen)
-              end
-            end
+            request = IO::Async::Private::Request::Bind.new(
+              Fiber.current,
+              fd: fd,
+              addr: addr,
+              addrlen: addrlen,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           # Non-blocking connect is somewhat complicated. The steps are:
@@ -124,18 +149,23 @@ class IO
           #
           # Fitting all of these steps in here is crucial.
           def connect(fd:, addr:, addrlen:, timeout:)
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], starting nonblocking connect")
             reply = Platforms::Functions.connect(fd, addr, addrlen)
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], #{reply.inspect}")
             return reply if reply[:rc].zero? || connect_failed?(reply)
 
             # step 3
-            reply = build_poll_write_request(fd: fd, repeat: false) do |fiber|
-              build_command(fiber) do
-                # step 4
-                { writeable: true }
-              end
-            end
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect step 3")
+            request = IO::Async::Private::Request::Connect.new(
+              Fiber.current,
+              fd: fd,
+              timeout: timeout
+            )
+            reply = enqueue(request)
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect fd is writeable")
 
             # step 5
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect check SO_ERROR")
             error = ::FFI::MemoryPointer.new(:int)
             reply = getsockopt(
               fd: fd,
@@ -146,6 +176,7 @@ class IO
             )
 
             # step 6
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect step 6")
             reply[:errno] = error.read_int if reply[:rc] < 0
             reply
           end
@@ -158,27 +189,36 @@ class IO
           end
 
           def listen(fd:, backlog:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.listen(fd, backlog)
-              end
-            end
+            request = IO::Async::Private::Request::Listen.new(
+              Fiber.current,
+              fd: fd,
+              backlog: backlog,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def accept(fd:, addr:, addrlen:, timeout:)
-            build_poll_read_request(fd: fd, repeat: false) do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.accept(fd, addr, addrlen)
-              end
-            end
+            request = IO::Async::Private::Request::Accept.new(
+              Fiber.current,
+              fd: fd,
+              addr: addr,
+              addrlen: addrlen,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def send(fd:, buffer:, nbytes:, flags:, timeout:)
-            build_poll_write_request(fd: fd, repeat: false) do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.send(fd, buffer, nbytes, flags.to_i)
-              end
-            end
+            request = IO::Async::Private::Request::Send.new(
+              Fiber.current,
+              fd: fd,
+              buffer: buffer,
+              nbytes: nbytes,
+              flags: flags,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def sendto(fd:, buffer:, nbytes:, flags:, addr:, addr_len:, timeout:)
@@ -196,11 +236,15 @@ class IO
           end
 
           def recv(fd:, buffer:, nbytes:, flags:, timeout:)
-            build_poll_read_request(fd: fd, repeat: false) do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.recv(fd, buffer, nbytes, flags.to_i)
-              end
-            end
+            request = IO::Async::Private::Request::Recv.new(
+              Fiber.current,
+              fd: fd,
+              buffer: buffer,
+              nbytes: nbytes,
+              flags: flags,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def recvfrom(fd:, buffer:, nbytes:, flags:, addr:, addr_len:, timeout:)
@@ -218,16 +262,11 @@ class IO
           end
 
           def timer(duration:)
-            start = Time.now.to_f
-            reply = build_timer_request(duration: duration, repeat: false) do |fiber|
-              build_command(fiber) do
-                {
-                  actual_duration: (Time.now.to_f - start)
-                }
-              end
-            end
-
-            reply
+            request = IO::Async::Private::Request::Timer.new(
+              Fiber.current,
+              duration: duration
+            )
+            reply = enqueue(request)
           end
 
           #
@@ -276,7 +315,12 @@ class IO
 
           def enqueue(request)
             request.sequence_no = next_sequence_number
+            Fiber.current.local[:_now_] ||= Time.now
+            secs = Time.now - Fiber.current.local[:_now_]
+            c = caller.join(', ')
+            Logger.debug(klass: self.class, name: :enqueue, message: "[#{tid}], [#{secs}] spent in this fiber, #{c.inspect}")
             reply = Thread.current.local[:_scheduler_].schedule_request(request)
+            Fiber.current.local[:_now_] = Time.now
 
             while true
               if reply.nil?
