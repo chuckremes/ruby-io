@@ -110,6 +110,12 @@ class IO
               Platforms::Functions.getaddrinfo(hostname, service, hints, results)
             end
           end
+
+          # Need to override for this specific one since attempting to inspect
+          # +hints+ or +results+ results in a null pointer exception from FFI.
+          def inspect
+            "hostname [#{@kwargs[:hostname]}], service [#{@kwargs[:service]}]"
+          end
         end
 
         class Getsockopt < BaseBlocking
