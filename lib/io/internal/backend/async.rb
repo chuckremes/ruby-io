@@ -83,20 +83,15 @@ class IO
           end
 
           def getaddrinfo(hostname:, service:, hints:, results:, timeout:)
-            build_blocking_request do |fiber|
-              build_command(fiber) do
-                Platforms::Functions.getaddrinfo(hostname, service, hints, results)
-              end
-            end
-#            request = IO::Async::Private::Request::Getaddrinfo.new(
-#              Fiber.current,
-#              hostname: hostname,
-#              service: service,
-#              hints: hints,
-#              results: results,
-#              timeout: timeout
-#            )
-#            reply = enqueue(request)
+            request = IO::Async::Private::Request::Getaddrinfo.new(
+              Fiber.current,
+              hostname: hostname,
+              service: service,
+              hints: hints,
+              results: results,
+              timeout: timeout
+            )
+            reply = enqueue(request)
           end
 
           def socket(domain:, type:, protocol:, timeout:)
@@ -210,6 +205,9 @@ class IO
           end
 
           def send(fd:, buffer:, nbytes:, flags:, timeout:)
+            reply = Platforms::Functions.send(fd, buffer, nbytes, flags)
+            return reply unless would_block?(reply)
+
             request = IO::Async::Private::Request::Send.new(
               Fiber.current,
               fd: fd,
@@ -222,6 +220,9 @@ class IO
           end
 
           def sendto(fd:, buffer:, nbytes:, flags:, addr:, addr_len:, timeout:)
+            reply = Platforms::Functions.sendto(fd, buffer, nbytes, flags, addr, addr_len)
+            return reply unless would_block?(reply)
+
             request = IO::Async::Private::Request::Sendto.new(
               Fiber.current,
               fd: fd,
@@ -267,6 +268,19 @@ class IO
               duration: duration
             )
             reply = enqueue(request)
+          end
+
+          #
+          # Helpers for determining if a scheduled call is required
+          #
+
+          def would_block?(reply)
+            return false if reply[:rc] >= 0
+
+            errno = reply[:errno]
+
+            errno == Errno::EAGAIN::Errno ||
+            errno == Errno::EWOULDBLOCK::Errno
           end
 
           #
@@ -346,8 +360,8 @@ class IO
             IO::Async::Private::Configure.setup
           end
 
-          def schedule_block(originator:, block:)
-            value = Thread.current.local[:_scheduler_].schedule_block(originator: originator, block: block)
+          def schedule_block(block:)
+            value = Thread.current.local[:_scheduler_].schedule_block(originator: Fiber.current, block: block)
             # when transferred back to this fiber, +value+ should be nil
             raise "transferred back to #connect fiber, but came with non-nil info [#{value.inspect}]" if value
           end
