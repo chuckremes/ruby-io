@@ -48,13 +48,12 @@ class IO
       def register_timer(duration:, request:)
         timer = @timers.add_oneshot(delay: duration, callback: request)
         register(
-          fd: 1,
+          fd: timer.hash,
           request: request,
           filter: Constants::EVFILT_TIMER,
           flags: Constants::EV_ADD | Constants::EV_ENABLE | Constants::EV_ONESHOT,
           fflags: Constants::NOTE_MSECONDS,
-          data: duration,
-          udata: timer.object_id
+          data: duration
         )
         Logger.debug(klass: self.class, name: 'kqueue poller', message: "registered for timer duration [#{duration}], object_id [#{request.object_id}]")
       end
@@ -163,8 +162,15 @@ class IO
         delay_ms = 50 if delay_ms.zero?
 
         # convert to local units
-        seconds = delay_ms / 1_000
-        nanoseconds = (delay_ms % 1_000) * 1_000_000
+        if delay_ms > 0
+          Logger.debug(klass: self.class, name: :shortest_timeout, message: "ms [#{delay_ms}]")
+          seconds = delay_ms / 1_000
+          nanoseconds = (delay_ms % 1_000) * 1_000_000
+        else
+          Logger.debug(klass: self.class, name: :shortest_timeout, message: 'ms [0], poll immediately')
+          seconds = 0
+          nanoseconds = 0
+        end
 
         @timespec[:tv_sec] = seconds
         @timespec[:tv_nsec] = nanoseconds
