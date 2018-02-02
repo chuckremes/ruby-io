@@ -67,7 +67,7 @@ class IO
             # no op
           end
 
-          def schedule_block(originator:, block:)
+          def schedule_block(block:)
             f = Fiber.new do
               block.call
             end
