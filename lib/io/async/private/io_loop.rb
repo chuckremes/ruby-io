@@ -52,7 +52,8 @@ class IO
           Logger.debug(klass: self.class, name: :io_loop, message: 'entering infinite loop')
           while true
             process_system_messages
-            process_command_messages
+            process_command_mailboxes
+            flush_immediate
           end
         end
 
@@ -83,32 +84,43 @@ class IO
 
         # Commands sent from various IOFiber loops are processed here.
         # We track all of those mailboxes via the @incoming ivar. We
-        # pull messages from each mailbox and dispatch depending on
+        # iterate over each mailbox and pull all messages from each
+        # one only stopping when we've run out of messages or exceeded
+        # a dispatch limit.
+        def process_command_mailboxes
+          immediate_count = 0
+
+          each_mailbox do |mailbox|
+            dispatch_limit = process_command_messages(mailbox)
+            break if dispatch_limit
+          end
+        end
+
+        # Pull messages from each mailbox and dispatch depending on
         # their type. Some commands require blocking so they are
         # dispatched to a worker pool. Other commands are non-blocking
         # and are handled in this loop directly.
-        def process_command_messages
+        def process_command_messages(mailbox)
           immediate_count = 0
+          limit_reached = false
 
-          incoming_values.each do |mailbox|
-            request = mailbox.pickup
-            next unless request # a non-blocking read from an empty queue returns nil
-
+          each_request(mailbox) do |request|
             Logger.debug(klass: self.class, name: :process_command_messages, message: "request #{request.inspect}")
 
             if request.blocking?
               dispatch_to_workers(request)
             else
-              # Only process up to +max_allowed+ requests for immediate dispatch
-              if immediate_count > @poller.max_allowed
-                Logger.debug(klass: self.class, name: :process_command_messages, message: "immediate_count [#{immediate_count}] exceeded max!")
-                break
-              end
               immediate_count += 1
               immediate_dispatch(request)
+
+              # Only process up to +max_allowed+ requests for immediate dispatch
+              if immediate_count >= @poller.max_allowed
+                Logger.debug(klass: self.class, name: :process_command_messages, message: "immediate_count [#{immediate_count}] exceeded max!", force: true)
+                return true
+              end
             end
           end
-          flush_immediate
+          limit_reached
         end
 
         def dispatch_to_workers(request)
@@ -172,6 +184,18 @@ class IO
 
         def incoming_values
           values = @mutex.synchronize { @incoming.values.to_a }
+        end
+
+        def each_mailbox
+          incoming_values.each { |mbox| yield(mbox) }
+        end
+
+        def each_request(mbox)
+          loop do
+            request = mbox.pickup
+            break unless request # a non-blocking read from an empty mailbox returns nil
+            yield(request)
+          end
         end
 
         IOLoop.current # make sure we allocate it during load step
