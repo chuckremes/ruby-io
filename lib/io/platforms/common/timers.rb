@@ -39,13 +39,13 @@ class IO
         end
 
         # Returns the number of milliseconds until next timer
-        # should fire. If it's in the past, then return 0.
+        # should fire. If it's in the past, then return -1.
         def wait_interval
           timer = @timers.first
           return 0 unless timer
 
           delay = timer.fire_time - Timers.now
-          delay < 0 ? 0 : delay
+          delay < 0 ? -1 : delay
         end
 
         # Adds a non-periodical, one-shot timer in order of
@@ -56,7 +56,7 @@ class IO
         # does nothing when fired.
         #
         def add_oneshot(delay:, callback:)
-          Logger.debug(klass: self.class, name: :add_oneshot, message: "delay: #{delay}, callback: #{callback}")
+          Logger.debug(klass: self.class, name: :add_oneshot, message: "delay: #{delay}")
           return nil unless callback
 
           timer = Timer.new(timers: self, delay: delay, callback: callback)
@@ -90,7 +90,7 @@ class IO
           # Work around JRuby bug by converting set to array before dup'ing
           @timers.to_a.dup.each do |timer|
             break unless timer.expired?(now)
-            Logger.debug(klass: self.class, name: :fire_expired, message: 'firing expired timer!')
+            Logger.debug(klass: self.class, name: :fire_expired, message: "firing expired timer! #{timer.inspect}")
             timer.fire
             cancel(timer)
           end
@@ -176,7 +176,7 @@ class IO
         end
 
         def to_s
-          ftime = Time.at(@fire_time / 1000)
+          ftime = Time.at(@fire_time / 1_000.0).strftime "%Y-%m-%dT%H:%M:%S.%3N"
           fdelay = @fire_time - Timers.now
           name = @callback.respond_to?(:name) ? @callback.name : @callback.to_s
 
