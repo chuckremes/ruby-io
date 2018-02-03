@@ -135,7 +135,7 @@ class IO
         block = make_connect_block(self, rc, errno, &blk)
 
         # mark current fiber as ready to do more work
-        value = Config::Defaults.syscall_backend.schedule_block(originator: Fiber.current, block: block)
+        value = Config::Defaults.syscall_backend.schedule_block(block: block)
 
         # when transferred back to this fiber, +value+ should be nil
         raise "transferred back to #connect fiber, but came with non-nil info [#{value.inspect}]" if value
@@ -151,40 +151,32 @@ class IO
       end
     end
 
-    def accept(timeout: nil, &blk)
-      if block_given?
-        # when #accept gets a block, loop forever accepting connections
-        # No easy way to break out of this loop; one thought is to expose
-        # the "hidden" Promise attached to the accept syscall from this
-        # instance and let a method like #break_accept call #cancel
-        # or #fulfill on that Promise. Promise could then cause a break
-        # to be called to end the loop.
-        loop do
-          begin
-            start_call = Time.now
-            rc, errno, address, socket = safe_delegation do |context|
-              rc, errno, address, socket = context.accept(timeout: timeout)
-              [rc, errno, address, socket]
-            end
+    def accept(timeout: nil)
+      rc, errno, address, socket = safe_delegation do |context|
+        rc, errno, address, socket = context.accept(timeout: timeout)
+        [rc, errno, address, socket]
+      end
 
-            block = make_accept_block(address, socket, rc, errno, &blk)
+      [address, socket, rc, errno]
+    end
 
-            # Schedule block above to be run
-            Config::Defaults.syscall_backend.schedule_block(originator: Fiber.current, block: block)
-          end
-        end
-      else
+    def each_accept(timeout: nil, &blk)
+      return nil unless block_given?
+      # when #accept gets a block, loop forever accepting connections
+      # As of now, there is no way to exit that loop.
+      loop do
         rc, errno, address, socket = safe_delegation do |context|
-          rc, errno, address, socket = context.accept(timeout: timeout)
-          [rc, errno, address, socket]
+          context.accept(timeout: timeout)
         end
 
-        [address, socket, rc, errno]
+        block = make_accept_block(rc, errno, address, socket, &blk)
+
+        # Schedule block above to be run
+        Config::Defaults.syscall_backend.schedule_block(block: block)
       end
     end
 
     def accept_break
-      @accept_loop = false
     end
 
     def send(buffer:, nbytes:, flags:, timeout: nil)
@@ -241,25 +233,22 @@ class IO
       @context = behavior
     end
 
-    # Wrap the block passed to #accept in its own Proc. Capture
-    # the +address+, +socket+, +rc+, and +errno+ arguments from
-    # the local scope so we can pass them to the original block.
-    #
-    # Moved to its own method so the closure capture is cleaner.
-    # Had a very difficult bug (impossible to repro in a simplified
-    # manner) on MRI where the wrapped block would suspend in its
-    # own fiber and then be resumed by *another fiber* and close
-    # the socket. The original fiber would then resume in the
-    # future and the socket was already closed. Very odd. Moving
-    # Proc creation to its own method solved the issue.
-    def make_accept_block(address, socket, rc, errno)
+    # Wraps the block given to the accept loop into its own
+    # Proc so it can be independently scheduled to run.
+    def make_accept_block(rc, errno, address, socket)
       lambda do
         begin
-          val = yield(address, socket, rc, errno)
-          val
+          yield(address, socket, rc, errno)
+
+          # TODO: Need to rescue exceptions and somehow propogate them
+          # to surrounding thread. Extra work necessary since Fiber#transfer
+          # appears to short circuit the existing mechanisms to do this.
+          # Needs more research.
+          # Could maybe grab the exception here, wrap it up, and yield
+          # it to the block via rc & errno
         rescue => e
-          STDERR.puts "ACCEPT_BLOCK EXCEPTION! #{e.inspect}, #{e.backtrace.inspect}"
-          raise
+          STDERR.puts "ACCEPT_LOOP EXCEPTION! #{e.inspect}, #{e.backtrace.inspect}"
+          #raise
         ensure
           # socket may have failed to allocate so it could be nil
           socket.close if socket
