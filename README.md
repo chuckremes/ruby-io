@@ -26,7 +26,7 @@ Tested and works on:
 * Rubinius 3.87 (minimum required version)
 * TruffleRuby (master as of 20171230)
 * JRuby (master as of 20180102)
-  ** The default Multithread policy warns about accessing IO methods from multiple threads. I haven't chased this down yet but I guess that JRuby's fiber pooling may be involved. Fibers are backed by a thread and can migrate between threads in a pool.
+  * The default Multithread policy warns about accessing IO methods from multiple threads. There is an open issue (find number) regarding a bug where `Thread.current` is incorrectly reported for thread-backed Fibers. While it tracks the proper parent thread internally, it reports the actual pool thread backing the running Fiber.
 
 ## Platform Support
 Tested and working on:
