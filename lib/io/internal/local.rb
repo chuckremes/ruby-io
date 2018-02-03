@@ -35,12 +35,18 @@ class IO
         @storage.keys
       end
 
+      def safe?
+        ownership_check
+      rescue ThreadError
+        false
+      end
+
       private
 
       def ownership_check
         return if @creator == @klass.current
         raise ThreadError, "Access to local storage disallowed from non-originating thread or fiber!" +
-        " Expected [#{@creator.object_id}] but got #{@klass}.current [#{@klass.current.object_id}]."
+        " Expected [#{@creator.object_id} / #{@creator.hash}] but got #{@klass}.current [#{@klass.current.object_id} / #{@klass.current.hash}]."
       end
     end
 
@@ -50,12 +56,16 @@ class IO
       def initialize
         super(Fiber)
         @storage[:sequence_no] = -1
+        @storage[:_thr_hash] = Thread.current.hash
+        @storage[:_fiber_hash] = Fiber.current.hash
       end
     end
 
     class ThreadLocal < Local
       def initialize
         super(Thread)
+        @storage[:_thr_hash] = Thread.current.hash
+        @storage[:_fiber_hash] = Fiber.current.hash
       end
     end
 
