@@ -38,7 +38,6 @@ class IO
             return if Thread.current.local.key?(:_scheduler_)
             Logger.debug(klass: self.class, name: :make_io_fiber, message: 'allocating new Fiber Scheduler')
             Thread.current.local[:_scheduler_] = Scheduler.new
-            Logger.debug(klass: self.class, name: :make_io_fiber, message: 'Scheduler set')
 
             # Completes IO Fiber setup. When it yields, we return
             # to this location and the calling Fiber takes control again
