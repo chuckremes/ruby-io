@@ -15,6 +15,9 @@ class IO
 
           @mapper = Mapper.new
           @runnables = []
+          @outstanding_posts = 0
+          @_thr_hash = Thread.current.hash
+          Thread.current.local[:name] = Thread.current.local[:name].to_s + '-' + 'SCHED'
 
           @io_fiber = Internal::Fiber.new do |calling_fiber|
             @alive = true
@@ -22,6 +25,8 @@ class IO
             make_io_thread
             io_fiber_loop(calling_fiber)
           end
+          @_fiber_hash = @io_fiber.hash
+          @fid = "#{@_thr_hash}-#{@_fiber_hash}-SCHED"
           @state = :nil
           #          ObjectSpace.define_finalizer(self, self.class.finalize(@io_loop, @io_fiber, @outbox))
         end
@@ -41,15 +46,15 @@ class IO
         end
 
         def schedule_request(request)
-          Logger.debug(klass: self.class, name: :schedule_request, message: "[#{tid}], from [#{fid}] to [#{@io_fiber.fid}]")
+          Logger.debug(klass: self.class, name: :schedule_request, message: "[#{tid}], from [#{@fid} / #{@io_fiber.hash}] to [SCHED-#{@io_fiber.hash}]")
           val = enqueue(request)
-          Logger.debug(klass: self.class, name: :schedule_request, message: "[#{tid}], into [#{fid}], val #{val.inspect}")
+          Logger.debug(klass: self.class, name: :schedule_request, message: "[#{tid}], into [#{@fid} / #{@io_fiber.hash}], val #{val.inspect}")
           val
         end
 
         def schedule_block(originator:, block:)
           raise '+block+ arg must be a Proc!' unless block.is_a?(Proc)
-          Logger.debug(klass: self.class, name: :schedule_block, message: "[#{tid}], from [#{fid}] to [#{@io_fiber.fid}] with spawn block")
+          Logger.debug(klass: self.class, name: :schedule_block, message: "[#{tid}], from [#{fid}] to scheduler [#{@io_fiber.hash}] with spawn block")
           val = enqueue(Request::Block.new(originator: originator, block: block))
           raise "Value from #schedule_block should be nil but is non-nil! #{val.inspect}" if val
           val
@@ -69,7 +74,7 @@ class IO
 
           @state = :complete
           @io_fiber.transfer(Fiber.current)
-          Logger.debug(klass: self.class, name: :complete_setup, message: "[#{tid}], into [#{fid}]")
+          Logger.debug(klass: self.class, name: :complete_setup, message: "[#{tid}], into [#{@fid}]")
         end
 
         # Setup a dedicated Thread to handle all incoming Async IO
@@ -109,7 +114,8 @@ class IO
 
           save_reference(request)
           save_reply_mailbox(request)
-          Logger.debug(klass: self.class, name: :post_request, message: "[#{tid}], posting request")
+          @outstanding_posts += 1
+          Logger.debug(klass: self.class, name: :post_request, message: "[#{tid}], posting request, [#{@outstanding_posts}] outstanding, seqno [#{request.sequence_no}]")
           @outbox.post(request)
         end
 
@@ -124,42 +130,27 @@ class IO
 
         def process_runnables
           while runnable = pop_runnable
-            fiber, argument = if runnable.is_a?(Response::Wrapper)
-              Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], processing a reply")
-
-              # lookup originator
-              request = lookup_reference(runnable.object)
-              [request.fiber, runnable.object]
-            elsif runnable.is_a?(Fiber)
-              Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], processing fiber [#{runnable.fid}]")
-              [runnable, nil]
-            elsif runnable.is_a?(Proc)
-              # wrap this in a fiber, add it to runnables, and restart this loop
-              Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], got block to make runnable")
-              f = make_runnable_from_proc(runnable)
-              add_runnable(f)
-
-              Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], restart loop from midway")
-              next # start loop from top
-              [nil, nil] # will never get here, but satisfies the compiler
-            end
+            fiber, argument = unwrap(runnable)
 
             # transfer to the fiber and pass correct argument
             # iofiber suspends here; when it is transferred back we
-            # expect a Request::Command. anything else is likely the
+            # expect command? to be true. anything else is likely the
             # return value of an exited fiber.
-            Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], from [#{fid}] to [#{fiber.fid}]")
+            Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], from [#{@fid} / #{Fiber.current.hash}] to [#{fiber.hash}]")
+            start_transfer = Time.now
             object = fiber.transfer(argument)
+            secs = Time.now - start_transfer
+            Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], [#{secs}] spent in transferred fiber [#{fiber.hash}]")
             setup_thread
-            Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], into [#{fid}]")
+            Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], into [#{@fid} / #{Fiber.current.hash}]")
 
             if command?(object)
               Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off command request")
               post(object)
             elsif object.is_a?(Request::Block)
-              Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off fiber")
-              add_runnable(object.block)
+              Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off fiber and block")
               add_runnable(object.originator)
+              add_runnable(make_runnable_from_proc(object.block))
             elsif object.nil?
               Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off nil, ignore!")
             else
@@ -171,8 +162,11 @@ class IO
         def process_replies
           return unless @alive
 
-          Logger.debug(klass: self.class, name: :process_replies, message: 'waiting for reply from inbox')
+          Logger.debug(klass: self.class, name: :process_replies, message: "[#{tid}], will suspend for reply from inbox, [#{@runnables.size}] runnables")
+          start_waiting = Time.now
           reply = @inbox.pickup(nonblocking: false)
+          @outstanding_posts -= 1
+          Logger.debug(klass: self.class, name: :process_replies, message: "[#{tid}], [#{Time.now - start_waiting}] secs suspended! [#{@outstanding_posts}] outstanding")
 
           raise 'Unexpectedly received a nil reply from IOLoop!' unless reply
           Logger.debug(klass: self.class, name: :process_replies, message: "[#{tid}], got reply to deliver, #{reply.inspect}")
@@ -184,7 +178,7 @@ class IO
         end
 
         def lookup_reference(reply)
-          @mapper[reply[:fiber]]
+          @mapper.delete(reply[:fiber])
         end
 
         def save_reply_mailbox(request)
@@ -192,11 +186,29 @@ class IO
           request.finish_setup
         end
 
+        def unwrap(runnable)
+          if runnable.is_a?(Response::Wrapper)
+            # lookup originator
+            request = lookup_reference(runnable.object)
+            Logger.debug(klass: self.class, name: :unwrap, message: "[#{tid}], processing a reply, sequence_no [#{request.sequence_no}]")
+            [request.fiber, runnable.object]
+
+          elsif runnable.is_a?(Fiber)
+            Logger.debug(klass: self.class, name: :unwrap, message: "[#{tid}], rescheduled fiber [#{runnable.hash}], #{runnable.inspect}")
+            [runnable, nil]
+          end
+        end
+
         def make_runnable_from_proc(block)
+          scheduler = self
           # Had to push this to its own method. When it was part of #process_runnables
           # it was confusing the +block+ variable in the closure and marking it as a Fiber.
           # Oops. Moving here solved that closure capture issue.
-          Fiber.new do
+          Internal::Fiber.new do
+            unless Thread.current.respond_to?(:local)
+              IO::Async::Private::Configure.setup_jruby_thread(scheduler)
+            end
+
             block.call
             Logger.debug(klass: self.class, name: :make_runnable_from_proc, message: "[#{tid}], fiber exiting, see where we transfer to")
           end
@@ -210,7 +222,15 @@ class IO
           # JRuby uses a thread pool for Fibers, so a Fiber may run on many different threads
           # over the course of its life. We need to add our extensions if they are missing.
           def setup_thread
-            Thread.current.extend(Internal::ThreadLocalMixin) unless Thread.current.respond_to?(:local)
+            unless Thread.current.respond_to?(:local)
+              thr_hash = Thread.current.hash
+              fiber_hash = Fiber.current.hash
+              Logger.debug(klass: self.class, name: :setup_thread, message: "current thread needs mixin!")
+              Logger.debug(klass: self.class, name: :setup_thread, message: "thread, creator [#{@_thr_hash}], now [#{thr_hash}]")
+              Logger.debug(klass: self.class, name: :setup_thread, message: "fiber , creator [#{@_fiber_hash}], now [#{fiber_hash}]")
+              Thread.current.extend(Internal::ThreadLocalMixin)
+              Thread.current.local[:name] = "SCHEDPOOL-#{@_thr_hash}"
+            end
           end
         else
           def setup_thread(); end
