@@ -1,5 +1,7 @@
 $: << '../lib'
 require 'io'
+DEBUG = false
+
 IO::Config::Defaults.configure_syscall_mode(mode: :nonblocking)
 
 port = '3490'
@@ -21,7 +23,6 @@ p client.connect(addr: addr)
 server.accept do |address, socket, fd, errno|
   puts "ACCEPTED A SOCKET, rc [#{fd}]"
   p address, socket, fd, errno
-  socket.close
 end
 
 IO.popen("netstat -an | grep #{port}") do |io|
@@ -30,7 +31,10 @@ IO.popen("netstat -an | grep #{port}") do |io|
   end
 end
 
-p client.close, server.close
+puts "CLOSING client & server"
+puts "client... [#{client.close.inspect}]"
+puts "server... [#{server.close.inspect}]"
+#p client.close, server.close
 
 sleep 2
 puts 'exiting...'
