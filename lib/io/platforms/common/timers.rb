@@ -116,8 +116,9 @@ class IO
         def add timer
           value = @timers << timer
           if @timers.size != @timers.to_a.size
-#            puts "Timers#add failed! @timers.size != @timers.to_a.size, [#{@timers.size}] != [#{@timers.to_a.size}]"
-            raise "Timers#add failed! @timers.size != @timers.to_a.size, [#{@timers.size}] != [#{@timers.to_a.size}]"
+            puts "Timers#add failed! @timers.size != @timers.to_a.size, [#{@timers.size}] != [#{@timers.to_a.size}]"
+            p caller
+            exit!
           end
           value
         end
