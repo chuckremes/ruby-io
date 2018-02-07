@@ -101,7 +101,8 @@ class IO
         # dispatched to a worker pool. Other commands are non-blocking
         # and are handled in this loop directly.
         def process_command_messages(mailbox)
-          immediate_count = 0
+          # backpressure on caller... guard against too many queued events
+          return true unless @poller.will_accept_more_events?
           limit_reached = false
 
           each_request(mailbox) do |request|
@@ -110,14 +111,13 @@ class IO
             if request.blocking?
               dispatch_to_workers(request)
             else
-              immediate_count += 1
               immediate_dispatch(request)
+            end
 
-              # Only process up to +max_allowed+ requests for immediate dispatch
-              if immediate_count >= @poller.max_allowed
-                Logger.debug(klass: self.class, name: :process_command_messages, message: "immediate_count [#{immediate_count}] exceeded max!", force: true)
-                return true
-              end
+            # backpressure
+            unless @poller.will_accept_more_events?
+              Logger.debug(klass: self.class, name: :process_command_messages, message: 'event count exceeded max!', force: true)
+              return true
             end
           end
           limit_reached
