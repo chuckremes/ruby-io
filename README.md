@@ -27,6 +27,7 @@ Tested and works on:
 * TruffleRuby (master as of 20171230)
 * JRuby (master as of 20180102)
   * The default Multithread policy warns about accessing IO methods from multiple threads. There is an open issue (find number) regarding a bug where `Thread.current` is incorrectly reported for thread-backed Fibers. While it tracks the proper parent thread internally, it reports the actual pool thread backing the running Fiber.
+  * This problem is tracked in Issues [1717](https://github.com/jruby/jruby/issues/1717) and [1806](https://github.com/jruby/jruby/issues/1806) in JRuby.
 
 ## Platform Support
 Tested and working on:
