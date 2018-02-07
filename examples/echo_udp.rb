@@ -4,8 +4,7 @@ require 'io'
 IO::Config::Defaults.configure_syscall_mode(mode: :nonblocking)
 IO::Config::Defaults.configure_multithread_policy(policy: :silent)
 
-RAND_SLEEP = 10
-CLIENT_COUNT = 10
+CLIENT_COUNT = 500
 
 threads = []
 
@@ -76,6 +75,7 @@ client_thread = IO::Internal::Thread.new do
       completed_count += 1
     end
   end
+
   puts "[#{Time.now - start_connects}] seconds to issue all #{CLIENT_COUNT} echo sends."
   IO::Timer.sleep(seconds: 1) until completed_count >= CLIENT_COUNT - 1
 
