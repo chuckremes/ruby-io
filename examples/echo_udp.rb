@@ -2,24 +2,18 @@ $: << '../lib'
 require 'io'
 
 IO::Config::Defaults.configure_syscall_mode(mode: :nonblocking)
-Thread.abort_on_exception = true
-DEBUG = false
+IO::Config::Defaults.configure_multithread_policy(policy: :silent)
+
 RAND_SLEEP = 10
 CLIENT_COUNT = 10
-
-def tid
-  Thread.current.object_id
-end
 
 threads = []
 
 port = '3490'
 structs = IO::UDP.getv4(hostname: 'localhost', service: port)
-Thread.current.local[:name] = 'MAIN' if DEBUG
 
 
 server_thread = IO::Internal::Thread.new do
-  Thread.current.local[:name] = 'SERVER' if DEBUG
   server = IO::UDP.ip4(addrinfo: structs.first)
   addr = structs.first.sock_addr_ref
   rc, errno = server.bind(addr: addr)
@@ -39,12 +33,12 @@ server_thread = IO::Internal::Thread.new do
       if string == 'exit'
         server_wait = false
         msg = 'goodbye'
-        rc, errno = server.sendto(buffer: msg, nbytes: msg.size, flags: 0, addr: addr_buffer, addr_len: addr_len_buffer.read_uint32)
+        rc, errno = server.sendto(buffer: msg, nbytes: msg.size, flags: 0, addr: addr_buffer, addr_len: addr_len_buffer.read_int)
         puts "SERVER: breaking out of loop, rc [#{rc}], errno [#{errno}]"
         break
       elsif server_wait
         puts "Server echoing back: #{string}"
-        rc, errno = server.sendto(buffer: string, nbytes: string.size, flags: 0, addr: addr_buffer, addr_len: addr_len_buffer.read_uint32)
+        rc, errno = server.sendto(buffer: string, nbytes: string.size, flags: 0, addr: addr_buffer, addr_len: addr_len_buffer.read_int)
         server_sent += 1
         server_wait = false if server_sent >= CLIENT_COUNT - 1
       end

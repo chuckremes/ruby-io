@@ -2,21 +2,20 @@ $: << '../lib'
 require 'io'
 
 IO::Config::Defaults.configure_syscall_mode(mode: :nonblocking)
+IO::Config::Defaults.configure_multithread_policy(policy: :silent)
 Thread.abort_on_exception = true
-DEBUG = false
-RAND_SLEEP = 10
-CLIENT_COUNT = 10
+RAND_SLEEP = 2
+CLIENT_COUNT = 500
 
-def tid
-  Thread.current.object_id
+def formatted_time
+  Time.now.strftime "%Y-%m-%dT%H:%M:%S.%3N"
 end
 
 threads = []
 
 port = '3490'
 structs = IO::TCP.getv4(hostname: 'localhost', service: port)
-Thread.current.local[:name] = 'MAIN' if DEBUG
-
+Thread.current.extend(IO::Internal::ThreadLocalMixin)
 
 server_thread = IO::Internal::Thread.new do
   server = IO::TCP.ip4(addrinfo: structs.first)
@@ -25,99 +24,79 @@ server_thread = IO::Internal::Thread.new do
   server.listen(backlog: 5)
   i = -1
 
-  server_wait = true
-  server_accept_time = Time.now
-  server_sent = 0
-
-  server.accept do |_address, socket, fd, errno|
+  server.each_accept do |_address, socket, fd, errno|
     if fd > 0
       i += 1
       rc, errno, string = socket.recv(buffer: nil, nbytes: 20, flags: 0)
       raise "Server failed to receive! rc [#{rc}], errno [#{errno}]" if rc < 0
-      puts "Server received message: #{string}"
+
+      puts "[#{formatted_time}] Server received message: #{string}"
 
       if string == 'exit'
-        server_wait = false
         reply = 'goodbye'
         rc, errno = socket.send(buffer: reply, nbytes: reply.size, flags: 0)
         raise "Server failed to send exit message!" if rc < 0
-        server.accept_break
-      elsif server_wait
-        timer_reply = IO::Timer.sleep(seconds: rand(RAND_SLEEP))
-        puts "Server echoing back: #{string}, #{Time.now.to_f}"
+
+      else
+        sec = rand(RAND_SLEEP)
+        #puts "[#{formatted_time}] Server will randomly sleep [#{sec}] seconds before echoing, #{string}"
+        timer_reply = IO::Timer.sleep(seconds: sec)
+
+        puts "[#{formatted_time}] Server echoing back: #{string}"
         rc, errno = socket.send(buffer: string, nbytes: string.size, flags: 0)
         raise "Server failed to send echo message: #{string}, rc [#{rc}], errno [#{errno}]" if rc < 0
-        server_sent += 1
-        server_wait = false if server_sent >= CLIENT_COUNT - 1
       end
     else
       STDERR.puts "SERVER: shutting down early, accepted socket failed."
     end
   end
 
-  Thread.current.local[:_scheduler_].finalize_loop
+  IO::Timer.sleep(seconds: nil) # sleep forever
 end
 
 completed_count = 0
-sleep 0.2
+sleep 0.2 # give server thread a chance to spin up otherwise first connect will raise
 
-client_thread = IO::Internal::Thread.new do
-  clients = []
-  times = {}
-
-  start_connects = Time.now
-  CLIENT_COUNT.times do |i|
-    top = Time.now
-    client = IO::TCP.ip4(addrinfo: structs.first)
-    addr = structs.first.sock_addr_ref
-
-    client.connect(addr: addr) do |sock, rc, errno|
-      client_sent_time = Time.now
-      fd = sock.instance_variable_get(:@fd)
-      raise "Client-#{i} failed to connect, rc [#{rc}], errno [#{errno}]" if rc < 0
-
-      msg = "echo message: #{i}"
-      puts "Client-#{i} sending message: #{msg}"
-      rc, errno = sock.send(buffer: msg, nbytes: msg.size, flags: 0)
-      raise "Client-#{i} failed to send! rc [#{rc}], errno [#{errno}]" if rc < 0
-      rc, errno, string = sock.recv(buffer: nil, nbytes: 20, flags: 0)
-      if string.size < 5
-        puts "Client-#{i} got a short response, let's try receiving again, #{Time.now.to_f}"
-        rc, errno, string = sock.recv(buffer: nil, nbytes: 20, flags: 0)
-        puts "Client-#{i} second echo!"
-      end
-      raise "received string [#{string.inspect}] is empty! rc [#{rc}], errno [#{errno}]" if string.size < 5
-      puts "Client-#{i} received message: #{string}, roundtrip time [#{Time.now - client_sent_time}] seconds"
-      completed_count += 1
-      IO::Timer.sleep(seconds: 8)
-    end
-  end
-
-  IO::Timer.sleep(seconds: 1) until completed_count >= CLIENT_COUNT
-
+CLIENT_COUNT.times do |i|
   client = IO::TCP.ip4(addrinfo: structs.first)
   addr = structs.first.sock_addr_ref
-  can_exit = false
+
   client.connect(addr: addr) do |sock, rc, errno|
-    raise "Client-last failed to connect, rc [#{rc}], errno [#{errno}]" if rc < 0
-    msg = 'exit'
+    raise "Client-#{i} failed to connect, rc [#{rc}], errno [#{errno}]" if rc < 0
+
+    msg = "echo message: #{i}"
+    puts "[#{formatted_time}] Client-#{i}, sending message: #{msg}"
     rc, errno = sock.send(buffer: msg, nbytes: msg.size, flags: 0)
-    raise "Client-last failed to send message, rc [#{rc}], errno [#{errno}]" if rc < 0
-    completed_count += 1
+    raise "Client-#{i} failed to send! rc [#{rc}], errno [#{errno}]" if rc < 0
+
     rc, errno, string = sock.recv(buffer: nil, nbytes: 20, flags: 0)
-    puts "Client-last received: #{string}"
-    can_exit = true
-    nil
+    raise "received string [#{string.inspect}] is empty! rc [#{rc}], errno [#{errno}]" if string.size < 5
+
+    puts "[#{formatted_time}] Client-#{i} received message: #{string}"
+    completed_count += 1
   end
-
-  IO::Timer.sleep(seconds: 1) until can_exit
-
-  Thread.current.local[:_scheduler_].finalize_loop
 end
 
-# threads << server_thread
-threads << client_thread
+IO::Timer.sleep(seconds: 1) until completed_count >= CLIENT_COUNT
 
-threads.each(&:join)
+client = IO::TCP.ip4(addrinfo: structs.first)
+addr = structs.first.sock_addr_ref
+can_exit = false
+client.connect(addr: addr) do |sock, rc, errno|
+  raise "Client-last failed to connect, rc [#{rc}], errno [#{errno}]" if rc < 0
+  msg = 'exit'
+  rc, errno = sock.send(buffer: msg, nbytes: msg.size, flags: 0)
+  raise "Client-last failed to send message, rc [#{rc}], errno [#{errno}]" if rc < 0
 
-puts 'echo.rb is exiting normally... all threads joined.'
+  completed_count += 1
+  rc, errno, string = sock.recv(buffer: nil, nbytes: 20, flags: 0)
+  puts "Client-last received: #{string}"
+  can_exit = true
+  nil
+end
+
+IO::Timer.sleep(seconds: 1) until can_exit
+
+Thread.current.local[:_scheduler_].finalize_loop
+
+puts 'echo.rb is exiting normally... all clients responded.'
