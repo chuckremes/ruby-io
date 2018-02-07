@@ -5,10 +5,10 @@ class IO
     # called to process the +fd+.
     #
     # Not re-entrant or thread-safe. This class assumes it is called from a single
-    # thread in a serialized fashion. It maintains it's change_count internally
+    # thread in a serialized fashion. It maintains its change_count internally
     # so parallel calls would likely corrupt the changelist.
     class KqueuePoller
-      MAX_EVENTS = 10
+      MAX_EVENTS = 25
       NO_TIMEOUT = TimeSpecStruct.new
       SHORT_TIMEOUT = TimeSpecStruct.new.tap { |ts| ts[:tv_sec] = 1 }
       SELF_PIPE_READ_SIZE = 20
@@ -37,6 +37,10 @@ class IO
 
       def max_allowed
         MAX_EVENTS
+      end
+
+      def will_accept_more_events?
+        @change_count < MAX_EVENTS - 1
       end
 
       # Called to remove the +fd+ from the poller and delete any callbacks
@@ -143,6 +147,8 @@ class IO
       end
 
       def register(fd:, request:, filter:, flags:, fflags: 0, data: 0, udata: 0)
+        return if @change_count >= MAX_EVENTS # guard against too many events
+
         event = @events[@change_count]
         event.ev_set(
           ident: fd,
