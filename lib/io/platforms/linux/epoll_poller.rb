@@ -10,7 +10,7 @@ class IO
     # thread in a serialized fashion. It maintains it's change_count internally
     # so parallel calls would likely corrupt the changelist.
     class EPollPoller < Poller
-      MAX_EVENTS = 10
+      MAX_EVENTS = 25
 
       def initialize(self_pipe:)
         @epoll_fd = Platforms.epoll_create1(0)
@@ -85,10 +85,15 @@ class IO
           process_read_event(event: event)
         elsif event.write?
           process_write_event(event: event)
-        #elsif event.filter == Constants::EVFILT_TIMER
-        #  process_timer_event(event: event)
+        elsif event.empty?
+          if @readers.include?(event.fd) || @writers.include?(event.fd)
+            Logger.debug(klass: self.class, name: :process_event, message: "Got empty event for known fd [#{event.fd}], #{event.inspect}")
+            #raise "Got unknown event for known fd [#{event.fd}], #{event.inspect}"
+          #else
+          # # ignore if we don't know this FD
+          end
         else
-          raise "Fatal: unknown event #{event.inspect}"
+          raise "Fatal: unknown event [#{event.inspect}], readers #{@readers.inspect}, writers #{@writers.inspect}"
         end
       end
 
