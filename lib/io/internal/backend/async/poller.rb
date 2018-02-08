@@ -3,7 +3,7 @@ class IO
     module Backend
       class Async
 
-        Poller = Platforms::Poller
+        Poller = Platforms::ActivePoller
         
       end
     end
