@@ -13,11 +13,12 @@ class IO
       MAX_EVENTS = 10
       SHORT_TIMEOUT = 1_000 # milliseconds
       SELF_PIPE_READ_SIZE = 20
+      EMPTY_CALLBACK = Proc.new { nil }
 
       def initialize(self_pipe:)
         @epoll_fd = Platforms.epoll_create1(0)
 
-        # fatal error if we can't allocate the kqueue
+        # fatal error if we can't allocate the selector
         raise "Fatal error, epoll failed to allocate, rc [#{@epoll_fd}], errno [#{::FFI.errno}]" if @epoll_fd < 0
 
         @events_memory = ::FFI::MemoryPointer.new(Platforms::EPollEventStruct, MAX_EVENTS)
@@ -38,6 +39,15 @@ class IO
 
       def max_allowed
         MAX_EVENTS
+      end
+
+      def will_accept_more_events?
+        @change_count < MAX_EVENTS - 1
+      end
+
+      def deregister(fd:)
+        delete_from_selector(fd: fd)
+        delete_callbacks(fd: fd)
       end
 
       def register_timer(duration:, request:)
@@ -86,7 +96,13 @@ class IO
       private
 
       def process_event(event:)
-        if event.read?
+        #return if event.empty?
+
+        p event
+
+        if event.error?
+          process_error(event: event)
+        elsif event.read?
           process_read_event(event: event)
         elsif event.write?
           process_write_event(event: event)
@@ -95,6 +111,10 @@ class IO
         else
           raise "Fatal: unknown event #{event.inspect}"
         end
+      end
+
+      def process_error(event:)
+        Logger.debug(klass: self.class, name: :process_error, message: "event #{event.inspect}")
       end
 
       def process_read_event(event:)
@@ -110,7 +130,7 @@ class IO
       end
 
       def execute_callback(event:, identity:, callbacks:, kind:)
-        Logger.debug(klass: self.class, name: 'kqueue poller', message: "execute [#{kind}] callback for fd [#{identity}]")
+        Logger.debug(klass: self.class, name: 'epoll poller', message: "execute [#{kind}] callback for fd [#{identity}]")
 
         request = callbacks.delete(identity)
         if request
@@ -123,9 +143,6 @@ class IO
       # If an FD has already been registered, registering it a second time with CTL_ADD
       # returns errno 17 / EEXIST. Must modify existing FDs instead.
       #
-      # FIXME: When an FD is closed, need a way to detect that and remove from Poller.
-      # Otherwise, we'll have FDs registered that should not be and will likely return
-      # errors at bad moments.
       def add_or_modify(fd:)
         if @readers.member?(fd) || @writers.member?(fd)
           Constants::EPOLL_CTL_MOD
@@ -149,7 +166,7 @@ class IO
       end
 
       def self_pipe_read
-        Logger.debug(klass: self.class, name: 'kqueue poller', message: 'self-pipe awakened sleeping selector')
+        Logger.debug(klass: self.class, name: 'epoll poller', message: 'self-pipe awakened sleeping selector')
         # ignore read errors
         begin
           reply = Platforms::Functions.read(@self_pipe, @self_pipe_buffer, SELF_PIPE_READ_SIZE)
@@ -163,6 +180,29 @@ class IO
         @self_pipe = self_pipe
         @self_pipe_buffer = ::FFI::MemoryPointer.new(:int, SELF_PIPE_READ_SIZE)
         register_read(fd: @self_pipe, request: :self_pipe)
+      end
+
+      def delete_from_selector(fd:)
+        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleting, fd [#{fd}]")
+        exists = @readers.delete?(fd) || @writers.delete?(fd)
+        Logger.debug(klass: self.class, name: :delete_from_selector, message: "exists for fd [#{fd}] => [#{exists.inspect}]")
+        return unless exists
+
+        register(
+          fd: fd,
+          filter: Constants::EPOLLIN, # ignored for delete operation
+          operation: Constants::EPOLL_CTL_DEL
+        )
+        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleted, fd [#{fd}]")
+      end
+
+      def delete_callbacks(fd:)
+        @read_callbacks[fd] = EMPTY_CALLBACK if @read_callbacks.key?(fd)
+        @write_callbacks[fd] = EMPTY_CALLBACK if @write_callbacks.key?(fd)
+      end
+
+      def error?(event)
+        event.error?
       end
     end
 
