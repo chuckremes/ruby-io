@@ -19,7 +19,7 @@ class IO
         rc, errno = get_status_flags(fd: fd, timeout: timeout)
 
         return [rc, errno] if rc < 0
-        return [0, nil] if (rc & flag).zero?
+        return [0, nil] if (rc & flag) != 0
 
         current_flags = rc | flag
         fcntl(fd: fd, cmd: Constants::F_SETFD, args: current_flags.to_i, timeout: timeout)
@@ -33,7 +33,7 @@ class IO
         rc, errno = get_status_flags(fd: fd, timeout: timeout)
 
         return [rc, errno] if rc < 0
-        return [0, nil] if (rc & flag).zero?
+        return [0, nil] if (rc & flag) != 0
 
         current_flags = rc | flag
         fcntl(fd: fd, cmd: Constants::F_SETFL, args: current_flags.to_i, timeout: timeout)
@@ -43,7 +43,7 @@ class IO
         rc, errno = get_status_flags(fd: fd, timeout: timeout)
 
         return [rc, errno] if rc < 0
-        return [0, nil] if (rc & flag).zero?
+        return [0, nil] if (rc & flag) != 0
 
         current_flags = rc & ~flag
         fcntl(fd: fd, cmd: Constants::F_SETFL, args: current_flags.to_i, timeout: timeout)
