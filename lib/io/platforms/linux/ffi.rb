@@ -50,6 +50,14 @@ class IO
         (struct[:events] & Constants::EPOLLOUT) > 0
       end
 
+      def self.empty?(struct:)
+        struct[:events].zero?
+      end
+
+      def self.error?(struct:)
+        (struct[:events] & Constants::EPOLLERR) > 0
+      end
+
       def self.fd(struct:)
         struct[:data][:fd]
       end
@@ -75,6 +83,14 @@ class IO
         EPollEventStruct.write?(struct: self)
       end
 
+      def empty?
+        EPollEventStruct.empty?(struct: self)
+      end
+
+      def error?
+        EPollEventStruct.error?(struct: self)
+      end
+
       def fd
         EPollEventStruct.fd(struct: self)
       end
@@ -84,7 +100,7 @@ class IO
       end
 
       def inspect
-        "events  [#{self[:events]}],
+        "events  [#{self[:events].to_s(2)}],
          data.fd [#{self[:data][:fd]}],
          data.id [#{self[:data][:u64]}]"
       end
