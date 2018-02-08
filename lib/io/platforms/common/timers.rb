@@ -51,7 +51,7 @@ class IO
         # Adds a non-periodical, one-shot timer in order of
         # first-to-fire to last-to-fire.
         #
-        # Returns nil unless a +timer_proc+ is
+        # Returns nil unless a +callback+ is
         # provided. There is no point to an empty timer that
         # does nothing when fired.
         #
@@ -131,7 +131,7 @@ class IO
       class Timer
         include Comparable
 
-        attr_reader :fire_time, :timer_proc
+        attr_reader :fire_time, :callback
 
         # +delay+ is in milliseconds
         #
@@ -166,7 +166,7 @@ class IO
           # need a more specific equivalence test since multiple timers could be
           # scheduled to go off at exactly the same time
           #      @fire_time == other.fire_time &&
-          #      @timer_proc == other.timer_proc &&
+          #      @callback == other.callback &&
           #      @periodical == other.periodical?
           object_id == other.object_id
         end
