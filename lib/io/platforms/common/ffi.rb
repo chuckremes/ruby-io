@@ -29,7 +29,6 @@ class IO
     attach_function :recvmsg, [:int, :pointer, :int], :ssize_t, :blocking => true
     attach_function :pipe, [:pointer], :int, :blocking => true
     attach_function :getsockopt, [:int, :int, :int, :pointer, :pointer], :int, :blocking => true
-    attach_function :disconnectx, [:int, :int, :int], :int, :blocking => true
 
     # utilities
     attach_function :fcntl, [:int, :int, :int], :int, :blocking => true
