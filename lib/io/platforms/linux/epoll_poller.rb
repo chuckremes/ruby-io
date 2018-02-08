@@ -9,11 +9,8 @@ class IO
     # Not re-entrant or thread-safe. This class assumes it is called from a single
     # thread in a serialized fashion. It maintains it's change_count internally
     # so parallel calls would likely corrupt the changelist.
-    class EPollPoller
+    class EPollPoller < Poller
       MAX_EVENTS = 10
-      SHORT_TIMEOUT = 1_000 # milliseconds
-      SELF_PIPE_READ_SIZE = 20
-      EMPTY_CALLBACK = Proc.new { nil }
 
       def initialize(self_pipe:)
         @epoll_fd = Platforms.epoll_create1(0)
@@ -25,15 +22,10 @@ class IO
         @events = MAX_EVENTS.times.to_a.map do |index|
           Platforms::EPollEventStruct.new(@events_memory + index * Platforms::EPollEventStruct.size)
         end
-        @change_count = 0
-        @read_callbacks = {}
-        @write_callbacks = {}
-        @timer_callbacks = {}
         @readers = Set.new
         @writers = Set.new
-        @timers = Common::Timers.new
-        
-        self_pipe_setup(self_pipe)
+
+        super
         Logger.debug(klass: self.class, name: 'epoll poller', message: 'epoll allocated!')
       end
 
@@ -41,21 +33,8 @@ class IO
         MAX_EVENTS
       end
 
-      def will_accept_more_events?
-        @change_count < MAX_EVENTS - 1
-      end
-
-      def deregister(fd:)
-        delete_from_selector(fd: fd)
-        delete_callbacks(fd: fd)
-      end
-
-      def register_timer(duration:, request:)
-        @timers.add_oneshot(delay: duration, callback: request)
-      end
-
       def register_read(fd:, request:)
-        @read_callbacks[fd] = request
+        super
 
         register(
           fd: fd,
@@ -67,7 +46,7 @@ class IO
       end
 
       def register_write(fd:, request:)
-        @write_callbacks[fd] = request
+        super
 
         register(
           fd: fd,
@@ -113,10 +92,6 @@ class IO
         end
       end
 
-      def process_error(event:)
-        Logger.debug(klass: self.class, name: :process_error, message: "event #{event.inspect}")
-      end
-
       def process_read_event(event:)
         execute_callback(event: event, identity: event.fd, callbacks: @read_callbacks, kind: 'READ')
       end
@@ -127,17 +102,6 @@ class IO
 
       def process_timer_event(event:)
         execute_callback(event: event, identity: event.udata, callbacks: @timer_callbacks, kind: 'TIMER')
-      end
-
-      def execute_callback(event:, identity:, callbacks:, kind:)
-        Logger.debug(klass: self.class, name: 'epoll poller', message: "execute [#{kind}] callback for fd [#{identity}]")
-
-        request = callbacks.delete(identity)
-        if request
-          request == :self_pipe ? self_pipe_read : request.call
-        else
-          raise "Got [#{kind}] event for fd [#{identity}] with no registered callback"
-        end
       end
 
       # If an FD has already been registered, registering it a second time with CTL_ADD
@@ -159,27 +123,12 @@ class IO
         @change_count += 1
       end
 
-      def shortest_timeout
-        delay_ms = @timers.wait_interval.to_i
-        delay_ms = 50 if delay_ms.zero?
+      def make_timeout_struct(delay_ms)
         delay_ms
       end
 
-      def self_pipe_read
-        Logger.debug(klass: self.class, name: 'epoll poller', message: 'self-pipe awakened sleeping selector')
-        # ignore read errors
-        begin
-          reply = Platforms::Functions.read(@self_pipe, @self_pipe_buffer, SELF_PIPE_READ_SIZE)
-          rc = reply[:rc]
-        end until rc.zero? || rc == -1 || rc < SELF_PIPE_READ_SIZE
-        # necessary to reregister since everything is setup for ONESHOT
-        register_read(fd: @self_pipe, request: :self_pipe)
-      end
-
-      def self_pipe_setup(self_pipe)
-        @self_pipe = self_pipe
-        @self_pipe_buffer = ::FFI::MemoryPointer.new(:int, SELF_PIPE_READ_SIZE)
-        register_read(fd: @self_pipe, request: :self_pipe)
+      def no_timeout
+        0
       end
 
       def delete_from_selector(fd:)
@@ -196,17 +145,12 @@ class IO
         Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleted, fd [#{fd}]")
       end
 
-      def delete_callbacks(fd:)
-        @read_callbacks[fd] = EMPTY_CALLBACK if @read_callbacks.key?(fd)
-        @write_callbacks[fd] = EMPTY_CALLBACK if @write_callbacks.key?(fd)
-      end
-
       def error?(event)
         event.error?
       end
     end
 
-    class Poller < EPollPoller
+    class ActivePoller < EPollPoller
     end
   end
 end

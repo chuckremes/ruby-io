@@ -7,12 +7,8 @@ class IO
     # Not re-entrant or thread-safe. This class assumes it is called from a single
     # thread in a serialized fashion. It maintains its change_count internally
     # so parallel calls would likely corrupt the changelist.
-    class KqueuePoller
+    class KqueuePoller < Poller
       MAX_EVENTS = 25
-      NO_TIMEOUT = TimeSpecStruct.new
-      SHORT_TIMEOUT = TimeSpecStruct.new.tap { |ts| ts[:tv_sec] = 1 }
-      SELF_PIPE_READ_SIZE = 20
-      EMPTY_CALLBACK = Proc.new { nil }
 
       def initialize(self_pipe:)
         @kq_fd = Platforms.kqueue
@@ -24,14 +20,9 @@ class IO
         @events = MAX_EVENTS.times.to_a.map do |index|
           Platforms::KEventStruct.new(@events_memory + index * Platforms::KEventStruct.size)
         end
-        @change_count = 0
-        @read_callbacks = {}
-        @write_callbacks = {}
-        @timers = Common::Timers.new
         @timespec = TimeSpecStruct.new
 
-        self_pipe_setup(self_pipe)
-        Logger.debug(klass: self.class, name: 'kqueue poller', message: "registered self-pipe for read [#{@self_pipe}]")
+        super
         Logger.debug(klass: self.class, name: 'kqueue poller', message: 'kqueue allocated!')
       end
 
@@ -39,18 +30,9 @@ class IO
         MAX_EVENTS
       end
 
-      def will_accept_more_events?
-        @change_count < MAX_EVENTS - 1
-      end
-
-      # Called to remove the +fd+ from the poller and delete any callbacks
-      def deregister(fd:)
-        delete_from_selector(fd: fd)
-        delete_callbacks(fd: fd)
-      end
-
       def register_timer(duration:, request:)
-        timer = @timers.add_oneshot(delay: duration, callback: request)
+        timer = super
+
         register(
           fd: timer.hash,
           request: request,
@@ -63,7 +45,8 @@ class IO
       end
 
       def register_read(fd:, request:)
-        @read_callbacks[fd] = request
+        super
+
         register(
           fd: fd,
           request: request,
@@ -74,7 +57,8 @@ class IO
       end
 
       def register_write(fd:, request:)
-        @write_callbacks[fd] = request
+        super
+
         register(
           fd: fd,
           request: request,
@@ -88,7 +72,6 @@ class IO
       # in the changelist before we flush to +kevent+.
       def poll
         Logger.debug(klass: self.class, name: 'kqueue poller', message: 'calling kevent')
-        t = shortest_timeout
         rc = Platforms.kevent(@kq_fd, @events[0], @change_count, @events[0], MAX_EVENTS, shortest_timeout)
         @change_count = 0
         Logger.debug(klass: self.class, name: 'kqueue poller', message: "kevent returned [#{rc}] events!")
@@ -116,10 +99,6 @@ class IO
         end
       end
 
-      def process_error(event:)
-        Logger.debug(klass: self.class, name: :process_error, message: "event #{event.inspect}")
-      end
-
       def process_read_event(event:)
         Logger.debug(klass: self.class, name: :process_read_event, message: '')
         execute_callback(event: event, identity: event.ident, callbacks: @read_callbacks, kind: 'READ')
@@ -133,17 +112,6 @@ class IO
       def process_timer_event(event:)
         Logger.debug(klass: self.class, name: :process_timer_event, message: '')
         @timers.fire_expired
-      end
-
-      def execute_callback(event:, identity:, callbacks:, kind:)
-        Logger.debug(klass: self.class, name: 'kqueue poller', message: "execute [#{kind}] callback for fd [#{identity}]")
-
-        request = callbacks.delete(identity)
-        if request
-          request == :self_pipe ? self_pipe_read : request.call
-        else
-          raise "Got [#{kind}] event for fd [#{identity}] with no registered callback"
-        end
       end
 
       def register(fd:, request:, filter:, flags:, fflags: 0, data: 0, udata: 0)
@@ -162,18 +130,13 @@ class IO
         @change_count += 1
       end
 
-      def shortest_timeout
-        delay_ms = @timers.wait_interval.to_i
-
-        delay_ms = 50 if delay_ms.zero?
-
-        # convert to local units
+      def make_timeout_struct(delay_ms)
         if delay_ms > 0
-          Logger.debug(klass: self.class, name: :shortest_timeout, message: "ms [#{delay_ms}]")
+          Logger.debug(klass: self.class, name: :make_timeout_struct, message: "ms [#{delay_ms}]")
           seconds = delay_ms / 1_000
           nanoseconds = (delay_ms % 1_000) * 1_000_000
         else
-          Logger.debug(klass: self.class, name: :shortest_timeout, message: 'ms [0], poll immediately')
+          Logger.debug(klass: self.class, name: :make_timeout_struct, message: 'ms [0], poll immediately')
           seconds = 0
           nanoseconds = 0
         end
@@ -183,21 +146,8 @@ class IO
         @timespec
       end
 
-      def self_pipe_read
-        Logger.debug(klass: self.class, name: 'kqueue poller', message: 'self-pipe awakened sleeping selector')
-        # ignore read errors
-        begin
-          reply = Platforms::Functions.read(@self_pipe, @self_pipe_buffer, SELF_PIPE_READ_SIZE)
-          rc = reply[:rc]
-        end until rc.zero? || rc == -1 || rc < SELF_PIPE_READ_SIZE
-        # necessary to reregister since everything is setup for ONESHOT
-        register_read(fd: @self_pipe, request: :self_pipe)
-      end
-
-      def self_pipe_setup(self_pipe)
-        @self_pipe = self_pipe
-        @self_pipe_buffer = ::FFI::MemoryPointer.new(:int, SELF_PIPE_READ_SIZE)
-        register_read(fd: @self_pipe, request: :self_pipe)
+      def no_timeout
+        TimeSpecStruct.new
       end
 
       # Due to the vagaries of the blocking +close+ function being called by the worker
@@ -221,17 +171,12 @@ class IO
         Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleting, fd [#{fd}]")
       end
 
-      def delete_callbacks(fd:)
-        @read_callbacks[fd] = EMPTY_CALLBACK if @read_callbacks.key?(fd)
-        @write_callbacks[fd] = EMPTY_CALLBACK if @write_callbacks.key?(fd)
-      end
-
       def error?(event)
         (event.flags & Constants::EV_ERROR) > 0
       end
     end
 
-    class Poller < KqueuePoller
+    class ActivePoller < KqueuePoller
     end
   end
 end
