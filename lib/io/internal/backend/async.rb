@@ -175,7 +175,7 @@ class IO
 
             # step 6
             Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect step 6 on fd [#{fd}],
-              rc [#{reply[:rc]}], optval [#{optval.read_int}]")
+              rc [#{reply[:rc]}], optval [#{optval.read_int}], optlen [#{optlen.read_int}]")
             reply[:errno] = optval.read_int if reply[:rc] < 0
             reply
           end
