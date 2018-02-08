@@ -144,35 +144,39 @@ class IO
           #
           # Fitting all of these steps in here is crucial.
           def connect(fd:, addr:, addrlen:, timeout:)
-            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], starting nonblocking connect")
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], starting nonblocking connect on fd [#{fd}]")
             reply = Platforms::Functions.connect(fd, addr, addrlen)
-            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], #{reply.inspect}")
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], on fd [#{fd}] #{reply.inspect}")
             return reply if reply[:rc].zero? || connect_failed?(reply)
 
             # step 3
-            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect step 3")
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect step 3 on fd [#{fd}]")
             request = IO::Async::Private::Request::Connect.new(
               Fiber.current,
               fd: fd,
               timeout: timeout
             )
             reply = enqueue(request)
-            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect fd is writeable")
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect fd is writeable on fd [#{fd}]")
 
             # step 5
-            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect check SO_ERROR")
-            error = ::FFI::MemoryPointer.new(:int)
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect check SO_ERROR on fd [#{fd}]")
+            optval = ::FFI::MemoryPointer.new(:int)
+            optlen = ::FFI::MemoryPointer.new(:int)
+            optlen.write_int(optlen.size)
             reply = getsockopt(
               fd: fd,
-              level: Constants::SockOpt::SOL_SOCKET,
-              option_name: Constants::SockOpt::SO_ERROR,
-              value: error,
-              length: error.size
+              level: Platforms::Constants::SockOpt::SOL_SOCKET,
+              option_name: Platforms::Constants::SockOpt::SO_ERROR,
+              value: optval,
+              length: optlen,
+              timeout: nil
             )
 
             # step 6
-            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect step 6")
-            reply[:errno] = error.read_int if reply[:rc] < 0
+            Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], nonblocking connect step 6 on fd [#{fd}],
+              rc [#{reply[:rc]}], optval [#{optval.read_int}]")
+            reply[:errno] = optval.read_int if reply[:rc] < 0
             reply
           end
 

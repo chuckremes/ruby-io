@@ -94,6 +94,14 @@ class IO
           reply(rc: rc, errno: errno)
         end
 
+        # man -s 2 getsockopt for description of purpose, return codes, and errno
+        def getsockopt(fd, level, optname, optval, optlen)
+          rc = Platforms.getsockopt(fd, level, optname, optval, optlen)
+          errno = rc < 0 ? ::FFI.errno : nil
+          Logger.debug(klass: self.class, name: 'getsockopt_command', message: "rc [#{rc}], errno [#{errno}]")
+          reply(rc: rc, errno: errno)
+        end
+
         # man -s 2 bind for description of purpose, return codes, and errno
         def bind(fd, addr, addrlen)
           rc = Platforms.bind(fd, addr, addrlen)
