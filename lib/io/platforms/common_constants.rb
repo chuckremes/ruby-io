@@ -90,12 +90,6 @@ class IO
         O_TRUNC     = Constants::O_TRUNC
         O_WRONLY    = Constants::O_WRONLY
       end
-
-      module SockOpt
-        SOL_SOCKET = 0xffff
-
-        SO_ERROR   = 0x1007
-      end
     end
   end
 end

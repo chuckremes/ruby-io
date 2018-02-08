@@ -1,5 +1,14 @@
 class IO
   module Platforms
+
+    module Constants
+      module SockOpt
+        SOL_SOCKET = 1
+
+        SO_ERROR   = 4
+      end
+    end
+
     #
     # Linux-specific functions
     #

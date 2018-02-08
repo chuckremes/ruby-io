@@ -5,6 +5,14 @@ class IO
     #
     typedef :int32,   :tv_sec
 
+    module Constants
+      module SockOpt
+        SOL_SOCKET = 0xffff
+
+        SO_ERROR   = 0x1007
+      end
+    end
+
     # attach to functions common to all POSIX-compliant platforms
     attach_function :open, [:pointer, :int, :int], :int, :blocking => true
     attach_function :close, [:int], :int, :blocking => true
