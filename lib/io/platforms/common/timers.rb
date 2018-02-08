@@ -114,13 +114,7 @@ class IO
         private
 
         def add timer
-          value = @timers << timer
-          if @timers.size != @timers.to_a.size
-            puts "Timers#add failed! @timers.size != @timers.to_a.size, [#{@timers.size}] != [#{@timers.to_a.size}]"
-            p caller
-            exit!
-          end
-          value
+          @timers << timer
         end
       end # class Timers
 
@@ -159,15 +153,14 @@ class IO
         end
 
         def <=>(other)
-          @fire_time <=> other.fire_time
+          # Workaround for a JRuby SortedSet problem. The first comparison
+          # should be sufficient, but JRuby (for now) needs the second
+          # comparison to break a tie.
+          cmp = @fire_time <=> other.fire_time
+          cmp.zero? ? object_id <=> other.object_id : cmp
         end
 
         def ==(other)
-          # need a more specific equivalence test since multiple timers could be
-          # scheduled to go off at exactly the same time
-          #      @fire_time == other.fire_time &&
-          #      @callback == other.callback &&
-          #      @periodical == other.periodical?
           object_id == other.object_id
         end
 
