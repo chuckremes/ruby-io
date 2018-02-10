@@ -39,9 +39,7 @@ class IO
       end
 
       def copy_to(copy:)
-        NUM_BYTES.times do |i|
-          copy[:bytes][i] = self[:bytes][i]
-        end
+        copy.pointer.__copy_from__(self.pointer, NUM_BYTES)
         copy.on = self.on
         copy
       end
