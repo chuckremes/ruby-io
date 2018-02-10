@@ -1,4 +1,7 @@
 require 'fiber' # pull in Fiber.current and Fiber#transfer
+require 'set' # load set early and create a SortedSet to work around a Rubinius issue
+# still investigating...
+s = SortedSet.new
 
 Thread.abort_on_exception = true
 DEBUG = false
