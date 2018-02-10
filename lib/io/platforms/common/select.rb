@@ -91,7 +91,7 @@ class IO
           string += "  " + sprintf("%08b", self[:bytes][i + 6]).reverse + ' | '
           string += "  " + sprintf("%08b", self[:bytes][i + 7]).reverse + "\n"
           i += 8
-        end while i < (Constants::FDSET_SIZE / 8)
+        end while i < NUM_BYTES
         string += "]\n"
         string
       end
