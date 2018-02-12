@@ -138,7 +138,9 @@ class IO
 
       def delete_from_selector(fd:)
         Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleting, fd [#{fd}]")
-        exists = @readers.delete?(fd) || @writers.delete?(fd)
+        r_exists = @readers.delete?(fd)
+        w_exists = @writers.delete?(fd)
+        exists = r_exists || w_exists
         Logger.debug(klass: self.class, name: :delete_from_selector, message: "exists for fd [#{fd}] => [#{exists.inspect}]")
         return unless exists
 
