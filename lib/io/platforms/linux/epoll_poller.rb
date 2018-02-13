@@ -26,7 +26,7 @@ class IO
         @writers = Set.new
 
         super
-        Logger.debug(klass: self.class, name: 'epoll poller', message: 'epoll allocated!')
+        Logger.debug(klass: self.class, name: 'epoll', message: 'epoll allocated!')
       end
 
       def max_allowed
@@ -42,7 +42,7 @@ class IO
           operation: add_or_modify(fd: fd)
         )
         @readers << fd # on future calls, we will know to just modify existing registered FD
-        Logger.debug(klass: self.class, name: 'epoll poller', message: "registered for read, fd [#{fd}]")
+        Logger.debug(klass: self.class, name: 'epoll', message: "registered for read, fd [#{fd}], readers #{@readers.inspect}")
       end
 
       def register_write(fd:, request:)
@@ -54,7 +54,7 @@ class IO
           operation: add_or_modify(fd: fd)
         )
         @writers << fd
-        Logger.debug(klass: self.class, name: 'epoll poller', message: "registered for write, fd [#{fd}]")
+        Logger.debug(klass: self.class, name: 'epoll', message: "registered for write, fd [#{fd}]")
       end
 
       # Waits for epoll events. We can receive up to MAX_EVENTS in reponse.
@@ -62,36 +62,25 @@ class IO
         Logger.debug(klass: self.class, name: 'epoll_wait poller', message: 'calling epoll_wait')
         rc = Platforms.epoll_wait(@epoll_fd, @events[0], MAX_EVENTS, shortest_timeout)
         @change_count = 0
-        Logger.debug(klass: self.class, name: 'epoll poller', message: "epoll_wait returned [#{rc}] events!")
+        Logger.debug(klass: self.class, name: 'epoll', message: "epoll_wait returned [#{rc}] events!")
 
         if rc >= 0
           rc.times { |index| process_event(event: @events[index]) }
           @timers.fire_expired
         else
-          Logger.debug(klass: self.class, name: 'epoll_wait poller', message: "rc [#{rc}], errno [#{::FFI.errno}]")
+          Logger.debug(klass: self.class, name: 'epoll', message: "rc [#{rc}], errno [#{::FFI.errno}]")
         end
       end
 
       private
 
       def process_event(event:)
-        #return if event.empty?
-
-        p event
-
         if event.error?
           process_error(event: event)
         elsif event.read?
           process_read_event(event: event)
         elsif event.write?
           process_write_event(event: event)
-        elsif event.empty?
-          if @readers.include?(event.fd) || @writers.include?(event.fd)
-            Logger.debug(klass: self.class, name: :process_event, message: "Got empty event for known fd [#{event.fd}], #{event.inspect}")
-            #raise "Got unknown event for known fd [#{event.fd}], #{event.inspect}"
-          #else
-          # # ignore if we don't know this FD
-          end
         else
           raise "Fatal: unknown event [#{event.inspect}], readers #{@readers.inspect}, writers #{@writers.inspect}"
         end
@@ -121,8 +110,13 @@ class IO
       end
 
       def register(fd:, filter:, operation:)
-        event = @events[@change_count]
-        event.setup(fd: fd, events: filter)
+        event = nil
+        unless operation == Constants::EPOLL_CTL_DEL
+          event = @events[@change_count]
+          event.setup(fd: fd, events: filter)
+        end
+        Logger.debug(klass: self.class, name: :register, message: "register fd [#{fd}], filter [#{filter}], op [#{operation}]")
+
         rc = Platforms.epoll_ctl(@epoll_fd, operation, fd, event)
         raise "Fatal error, epoll_ctl returned [#{rc}], errno [#{::FFI.errno}]" if rc < 0
         @change_count += 1
@@ -137,17 +131,18 @@ class IO
       end
 
       def delete_from_selector(fd:)
-        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleting, fd [#{fd}]")
-        exists = @readers.delete?(fd) || @writers.delete?(fd)
-        Logger.debug(klass: self.class, name: :delete_from_selector, message: "exists for fd [#{fd}] => [#{exists.inspect}]")
+        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleting, fd [#{fd}]", force: true)
+        r_exists = @readers.delete?(fd)
+        w_exists = @writers.delete?(fd)
+        exists = r_exists || w_exists
         return unless exists
 
         register(
           fd: fd,
-          filter: Constants::EPOLLIN, # ignored for delete operation
+          filter: 0,
           operation: Constants::EPOLL_CTL_DEL
         )
-        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleted, fd [#{fd}]")
+        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleted, fd [#{fd}]", force: true)
       end
 
       def error?(event)
