@@ -18,7 +18,7 @@ class IO
       attach_function :epoll_wait, [:int, :pointer, :int, :int], :int, :blocking => true
     rescue ::FFI::NotFoundError
       # fall back to select(2)
-      require_relative '../common/poller'
+      require_relative '../common/select_poller'
     end
 
     #           typedef union epoll_data {
