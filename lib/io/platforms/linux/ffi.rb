@@ -1,11 +1,32 @@
 class IO
   module Platforms
+    AF_UNSPEC        = PF_UNSPEC = 0
+    AF_LOCAL         = PF_LOCAL  = 1
+    AF_INET          = PF_INET   = 2
+    AF_INET6         = PF_INET6  = 10
+    AI_PASSIVE       = 1
+    SOCK_STREAM      = 1
+    SOCK_DGRAM       = 2
+    IPPROTO_TCP      = 6
+    IPPROTO_UDP      = 17
+    INET_ADDRSTRLEN  = 16
+    INET6_ADDRSTRLEN = 46
+    SAE_ASSOCID_ANY  = 0
+    SAE_CONNID_ANY   = 0
+    SOMAXCONN        = 128
+
 
     module Constants
+
       module SockOpt
         SOL_SOCKET = 1
 
         SO_ERROR   = 4
+      end
+
+      module SockFlags
+        MSG_OOB    = 0x01
+        MSG_PEEK   = 0x02
       end
     end
 
