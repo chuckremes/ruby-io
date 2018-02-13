@@ -31,16 +31,15 @@ class IO
     #           struct epoll_event {
     #               uint32_t     events;    /* Epoll events */
     #               epoll_data_t data;      /* User data variable */
-    #           };
+    #           };                          /* this is a *packed* struct */
     class EPollDataUnion < FFI::Union
       layout \
-        :ptr, :pointer,
         :fd,  :int,
-        :u32, :uint32,
         :u64, :uint64
     end
 
     class EPollEventStruct < FFI::Struct
+      pack 1
       layout \
         :events, :uint32,
         :data, EPollDataUnion
@@ -52,11 +51,11 @@ class IO
       end
 
       def self.read?(struct:)
-        (struct[:events] & Constants::EPOLLIN) > 0
+        (struct[:events] & Constants::EPOLLIN) != 0
       end
 
       def self.write?(struct:)
-        (struct[:events] & Constants::EPOLLOUT) > 0
+        (struct[:events] & Constants::EPOLLOUT) != 0
       end
 
       def self.empty?(struct:)
@@ -64,7 +63,7 @@ class IO
       end
 
       def self.error?(struct:)
-        (struct[:events] & Constants::EPOLLERR) > 0
+        (struct[:events] & Constants::EPOLLERR) != 0
       end
 
       def self.fd(struct:)
