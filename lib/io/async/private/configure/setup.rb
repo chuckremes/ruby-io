@@ -8,6 +8,7 @@ class IO
             thread_extension
             fiber_extension
             make_io_fiber
+            true
           end
 
           def thread_extension
