@@ -361,10 +361,11 @@ class IO
           end
 
           def setup
-            IO::Async::Private::Configure.setup
+            @set ||= IO::Async::Private::Configure.setup
           end
 
           def schedule_block(block:)
+            setup
             value = Thread.current.local[:_scheduler_].schedule_block(originator: Fiber.current, block: block)
             # when transferred back to this fiber, +value+ should be nil
             raise "transferred back to #connect fiber, but came with non-nil info [#{value.inspect}]" if value
