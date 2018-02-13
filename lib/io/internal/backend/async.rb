@@ -361,7 +361,7 @@ class IO
           end
 
           def setup
-            @set ||= IO::Async::Private::Configure.setup
+            IO::Async::Private::Configure.setup
           end
 
           def schedule_block(block:)
