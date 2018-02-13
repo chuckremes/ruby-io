@@ -97,7 +97,7 @@ class IO
         def io_fiber_loop(calling_fiber)
           request = calling_fiber.transfer
           setup_thread
-          post(request)
+          categorize_request(request) # prime the pump with a runnable!
 
           begin
             process_runnables
@@ -144,18 +144,7 @@ class IO
             setup_thread
             Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], into [#{@fid} / #{Fiber.current.hash}]")
 
-            if command?(object)
-              Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off command request")
-              post(object)
-            elsif object.is_a?(Request::Block)
-              Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off fiber and block")
-              add_runnable(object.originator)
-              add_runnable(make_runnable_from_proc(object.block))
-            elsif object.nil?
-              Logger.debug(klass: self.class, name: :process_runnables, message: "[#{tid}], handed off nil, ignore!")
-            else
-              raise "Do not understand this object, class #{object.class}, #{object.inspect}"
-            end
+            categorize_request(object)
           end
         end
 
@@ -196,6 +185,21 @@ class IO
           elsif runnable.is_a?(Fiber)
             Logger.debug(klass: self.class, name: :unwrap, message: "[#{tid}], rescheduled fiber [#{runnable.hash}], #{runnable.inspect}")
             [runnable, nil]
+          end
+        end
+
+        def categorize_request(object)
+          if command?(object)
+            Logger.debug(klass: self.class, name: :categorize_request, message: "[#{tid}], handed off command request")
+            post(object)
+          elsif object.is_a?(Request::Block)
+            Logger.debug(klass: self.class, name: :categorize_request, message: "[#{tid}], handed off fiber and block")
+            add_runnable(object.originator)
+            add_runnable(make_runnable_from_proc(object.block))
+          elsif object.nil?
+            Logger.debug(klass: self.class, name: :categorize_request, message: "[#{tid}], handed off nil, ignore!")
+          else
+            raise "Do not understand this object, class #{object.class}, #{object.inspect}"
           end
         end
 
