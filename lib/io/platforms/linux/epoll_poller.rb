@@ -131,7 +131,7 @@ class IO
       end
 
       def delete_from_selector(fd:)
-        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleting, fd [#{fd}]", force: true)
+        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleting, fd [#{fd}]")
         r_exists = @readers.delete?(fd)
         w_exists = @writers.delete?(fd)
         exists = r_exists || w_exists
@@ -142,7 +142,7 @@ class IO
           filter: 0,
           operation: Constants::EPOLL_CTL_DEL
         )
-        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleted, fd [#{fd}]", force: true)
+        Logger.debug(klass: self.class, name: :delete_from_selector, message: "deleted, fd [#{fd}]")
       end
 
       def error?(event)
