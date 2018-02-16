@@ -1,11 +1,32 @@
 class IO
   module Platforms
+    AF_UNSPEC        = PF_UNSPEC = 0
+    AF_LOCAL         = PF_LOCAL  = 1
+    AF_INET          = PF_INET   = 2
+    AF_INET6         = PF_INET6  = 10
+    AI_PASSIVE       = 1
+    SOCK_STREAM      = 1
+    SOCK_DGRAM       = 2
+    IPPROTO_TCP      = 6
+    IPPROTO_UDP      = 17
+    INET_ADDRSTRLEN  = 16
+    INET6_ADDRSTRLEN = 46
+    SAE_ASSOCID_ANY  = 0
+    SAE_CONNID_ANY   = 0
+    SOMAXCONN        = 128
+
 
     module Constants
+
       module SockOpt
         SOL_SOCKET = 1
 
         SO_ERROR   = 4
+      end
+
+      module SockFlags
+        MSG_OOB    = 0x01
+        MSG_PEEK   = 0x02
       end
     end
 
@@ -18,7 +39,7 @@ class IO
       attach_function :epoll_wait, [:int, :pointer, :int, :int], :int, :blocking => true
     rescue ::FFI::NotFoundError
       # fall back to select(2)
-      require_relative '../common/poller'
+      require_relative '../common/select_poller'
     end
 
     #           typedef union epoll_data {
@@ -31,16 +52,15 @@ class IO
     #           struct epoll_event {
     #               uint32_t     events;    /* Epoll events */
     #               epoll_data_t data;      /* User data variable */
-    #           };
+    #           };                          /* this is a *packed* struct */
     class EPollDataUnion < FFI::Union
       layout \
-        :ptr, :pointer,
         :fd,  :int,
-        :u32, :uint32,
         :u64, :uint64
     end
 
     class EPollEventStruct < FFI::Struct
+      pack 1
       layout \
         :events, :uint32,
         :data, EPollDataUnion
@@ -52,11 +72,11 @@ class IO
       end
 
       def self.read?(struct:)
-        (struct[:events] & Constants::EPOLLIN) > 0
+        (struct[:events] & Constants::EPOLLIN) != 0
       end
 
       def self.write?(struct:)
-        (struct[:events] & Constants::EPOLLOUT) > 0
+        (struct[:events] & Constants::EPOLLOUT) != 0
       end
 
       def self.empty?(struct:)
@@ -64,7 +84,7 @@ class IO
       end
 
       def self.error?(struct:)
-        (struct[:events] & Constants::EPOLLERR) > 0
+        (struct[:events] & Constants::EPOLLERR) != 0
       end
 
       def self.fd(struct:)

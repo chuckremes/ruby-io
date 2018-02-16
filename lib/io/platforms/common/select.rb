@@ -22,8 +22,10 @@ class IO
     class FDSetStruct < ::FFI::Struct
       include Enumerable
 
+      NUM_BYTES = Constants::FDSET_SIZE / 8 # likely to be 1024 / 8 => 128
+
       layout \
-        :bytes, [:uint8, Constants::FDSET_SIZE / 8]
+        :bytes, [:uint8, NUM_BYTES]
 
       attr_accessor :on
 
@@ -37,9 +39,7 @@ class IO
       end
 
       def copy_to(copy:)
-        (Constants::FDSET_SIZE / 8).times do |i|
-          copy[:bytes][i] = self[:bytes][i]
-        end
+        copy.pointer.__copy_from__(self.pointer, NUM_BYTES)
         copy.on = self.on
         copy
       end
@@ -91,7 +91,7 @@ class IO
           string += "  " + sprintf("%08b", self[:bytes][i + 6]).reverse + ' | '
           string += "  " + sprintf("%08b", self[:bytes][i + 7]).reverse + "\n"
           i += 8
-        end while i < (Constants::FDSET_SIZE / 8)
+        end while i < NUM_BYTES
         string += "]\n"
         string
       end
