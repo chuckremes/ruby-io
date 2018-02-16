@@ -39,6 +39,7 @@ class IO
       end
 
       def copy_to(copy:)
+        # doing this memcpy is ~25% faster than a byte-by-byte copy
         copy.pointer.__copy_from__(self.pointer, NUM_BYTES)
         copy.on = self.on
         copy
