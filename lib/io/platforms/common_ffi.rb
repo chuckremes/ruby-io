@@ -13,8 +13,8 @@ class IO
     # Load platform-specific files
     if ::FFI::Platform::IS_BSD
       require_relative 'bsd/ffi'
-#      require_relative 'bsd/kqueue_poller'
-      require_relative 'common/select_poller'
+      require_relative 'bsd/kqueue_poller'
+#      require_relative 'common/select_poller'
     elsif ::FFI::Platform::IS_LINUX
       require_relative 'linux/ffi'
       require_relative 'linux/epoll_poller'
