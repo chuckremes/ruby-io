@@ -47,6 +47,10 @@ class IO
           def selector_update(poller:)
             # no op by default
           end
+
+          def inspect
+            "#{@klass_name}, seqno [#{@sequence_no}]"
+          end
         end
 
         class BaseBlocking < BaseCommand
