@@ -19,6 +19,25 @@ class IO
     #
     attach_function :select, [:int, :pointer, :pointer, :pointer, :pointer], :int, :blocking => true
 
+    # A pure Ruby implementation of the structures and macros required by the
+    # #select syscall.
+    #
+    # By POSIX standard, the FDSET_SIZE does not exceed 1024.
+    #
+    # This implementation trades some space for time. The primary problem
+    # with most #select implementations is the time required to iterate
+    # through all FDs to see which bits have been turned on or off. We
+    # save a portion of that effort by including a SortedSet and explicitly
+    # tracking the bits that have been enabled by the caller. This consumes
+    # more memory (space) as a trade-off for time (execution speed).
+    #
+    # Note that this only partially helps with the FDSetStruct returned by
+    # a call to #select. The syscall has no knowledge of our SortedSet so
+    # we still need to do an exhaustive iteration over the SortedSet members
+    # to see if the bit is on or off. This optimization helps for sparse
+    # sets but as the number of open FDs grows closer to FDSET_SIZE the
+    # benefit shrinks.
+    #
     class FDSetStruct < ::FFI::Struct
       include Enumerable
 
