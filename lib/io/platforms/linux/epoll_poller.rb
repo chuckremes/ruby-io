@@ -1,3 +1,5 @@
+require_relative '../common/timers'
+require_relative '../common/poller'
 require 'set'
 
 class IO
@@ -13,14 +15,14 @@ class IO
       MAX_EVENTS = 25
 
       def initialize(self_pipe:)
-        @epoll_fd = Platforms.epoll_create1(0)
+        @epoll_fd = Platforms::Functions.epoll_create1(0)
 
         # fatal error if we can't allocate the selector
         raise "Fatal error, epoll failed to allocate, rc [#{@epoll_fd}], errno [#{::FFI.errno}]" if @epoll_fd < 0
 
-        @events_memory = ::FFI::MemoryPointer.new(Platforms::EPollEventStruct, MAX_EVENTS)
+        @events_memory = ::FFI::MemoryPointer.new(Platforms::Structs::EPollEventStruct, MAX_EVENTS)
         @events = MAX_EVENTS.times.to_a.map do |index|
-          Platforms::EPollEventStruct.new(@events_memory + index * Platforms::EPollEventStruct.size)
+          Platforms::Structs::EPollEventStruct.new(@events_memory + index * Platforms::Structs::EPollEventStruct.size)
         end
         @readers = Set.new
         @writers = Set.new

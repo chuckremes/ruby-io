@@ -13,9 +13,9 @@ class IO
 
         raise "failed to allocate socket" if result[:rc] < 0
 
-        if Platforms::PF_INET == domain
+        if POSIX::PF_INET == domain
           UDP4.new(fd: result[:rc])
-        elsif Platforms::PF_INET6 == domain
+        elsif POSIX::PF_INET6 == domain
           UDP6.new(fd: result[:rc])
         else
           # Temporary raise... should respect the set Policy. If socket
@@ -35,20 +35,20 @@ class IO
       end
 
       def getallstreams(hostname:, service:, timeout: nil)
-        hints = Platforms::AddrInfoStruct.new
-        hints[:ai_flags] = Platforms::AI_PASSIVE
-        hints[:ai_family] = Platforms::AF_UNSPEC
-        hints[:ai_socktype] = Platforms::SOCK_DGRAM
+        hints = POSIX::AddrInfoStruct.new
+        hints[:ai_flags] = POSIX::AI_PASSIVE
+        hints[:ai_family] = POSIX::AF_UNSPEC
+        hints[:ai_socktype] = POSIX::SOCK_DGRAM
 
         getaddrinfo(hostname: hostname, service: service, hints: hints, timeout: timeout)
       end
 
       def getv4(hostname:, service:, flags: nil, timeout: nil)
         # FIXME: add a Config::Socket::AddressInfoFlag class to handle ai_flags
-        hints = Platforms::AddrInfoStruct.new
-        hints[:ai_flags] = Platforms::AI_PASSIVE
-        hints[:ai_family] = Platforms::PF_INET
-        hints[:ai_socktype] = Platforms::SOCK_DGRAM
+        hints = POSIX::AddrInfoStruct.new
+        hints[:ai_flags] = POSIX::AI_PASSIVE
+        hints[:ai_family] = POSIX::PF_INET
+        hints[:ai_socktype] = POSIX::SOCK_DGRAM
 
         getaddrinfo(hostname: hostname, service: service, hints: hints, timeout: timeout)
       end
@@ -71,15 +71,15 @@ class IO
         loop do
           # We don't own the memory containing the addrinfo structs, so we need to copy
           # these to our own memory
-          addrinfo = Platforms::AddrInfoStruct.new(ptr)
+          addrinfo = POSIX::AddrInfoStruct.new(ptr)
 
-          if addrinfo[:ai_family] == Platforms::AF_INET
-            Platforms::SockAddrInStruct.new(addrinfo[:ai_addr])
+          if addrinfo[:ai_family] == POSIX::AF_INET
+            POSIX::SockAddrInStruct.new(addrinfo[:ai_addr])
           else
-            Platforms::SockAddrIn6Struct.new(addrinfo[:ai_addr])
+            POSIX::SockAddrIn6Struct.new(addrinfo[:ai_addr])
           end
 
-          structs << Platforms::AddrInfoStruct.copy_to_new(addrinfo)
+          structs << POSIX::AddrInfoStruct.copy_to_new(addrinfo)
 
           ptr = addrinfo[:ai_next]
           break if ptr.nil? || ptr.null?
@@ -236,7 +236,7 @@ class IO
   class UDP4 < UDP
     class << self
       def allocate_addr_buffer
-        addr_buffer = Platforms::SockAddrInStruct.new
+        addr_buffer = POSIX::SockAddrInStruct.new
         addr_len = ::FFI::MemoryPointer.new(:socklen_t)
         addr_len.write_int32(addr_buffer.size)
         [addr_buffer, addr_len]
@@ -251,7 +251,7 @@ class IO
   class UDP6 < UDP
     class << self
       def allocate_addr_buffer
-        addr_buffer = Platforms::SockAddrIn6Struct.new
+        addr_buffer = POSIX::SockAddrIn6Struct.new
         addr_len = ::FFI::MemoryPointer.new(:socklen_t)
         addr_len.write_int32(addr_buffer.size)
         [addr_buffer, addr_len]

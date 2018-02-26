@@ -38,7 +38,7 @@ class IO
           super
 
           # ignore errors
-          rc = Platforms::Functions.write(@pipe_fd, @buffer, 1)
+          rc = POSIX.write(@pipe_fd, @buffer, 1)
           Logger.debug(klass: self.class, name: 'post', message: "wrote to pipe [#{@pipe_fd}], rc #{rc.inspect}")
         end
       end

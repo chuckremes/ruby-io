@@ -42,6 +42,8 @@ require_relative 'io/internal/backend/multithread_policy'
 require_relative 'io/platforms/common_constants'
 require_relative 'io/platforms/common_ffi'
 require_relative 'io/platforms/functions'
+require_relative 'io/platforms/constants'
+require_relative 'io/platforms/structs'
 
 # temporary loading order to satisfy defaults
 require_relative 'io/internal/backend/async'
@@ -55,6 +57,7 @@ require_relative 'io/mixins/enumerable'
 
 require 'io/fcntl'
 require 'io/file'
+require 'io/socket'
 require 'io/tcp'
 require 'io/timer'
 require 'io/udp'

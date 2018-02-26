@@ -149,7 +149,7 @@ class IO
         #
         def self_pipe_trick_setup
           pipe_fds = ::FFI::MemoryPointer.new(:int, 2)
-          reply = Platforms::Functions.pipe(pipe_fds)
+          reply = POSIX.pipe(pipe_fds)
           rc = reply[:rc]
 
           # fatal error if this allocation fails

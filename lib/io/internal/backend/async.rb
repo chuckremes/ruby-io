@@ -145,7 +145,7 @@ class IO
           # Fitting all of these steps in here is crucial.
           def connect(fd:, addr:, addrlen:, timeout:)
             Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], starting nonblocking connect on fd [#{fd}]")
-            reply = Platforms::Functions.connect(fd, addr, addrlen)
+            reply = POSIX.connect(fd, addr, addrlen)
             Logger.debug(klass: self.class, name: :connect, message: "[#{tid}], on fd [#{fd}] #{reply.inspect}")
             return reply if reply[:rc].zero? || connect_failed?(reply)
 
@@ -166,8 +166,8 @@ class IO
             optlen.write_int(optlen.size)
             reply = getsockopt(
               fd: fd,
-              level: Platforms::Constants::SockOpt::SOL_SOCKET,
-              option_name: Platforms::Constants::SockOpt::SO_ERROR,
+              level: POSIX::SOL_SOCKET,
+              option_name: POSIX::SO_ERROR,
               value: optval,
               length: optlen,
               timeout: nil
@@ -209,7 +209,7 @@ class IO
           end
 
           def send(fd:, buffer:, nbytes:, flags:, timeout:)
-            reply = Platforms::Functions.send(fd, buffer, nbytes, flags)
+            reply = POSIX.send(fd, buffer, nbytes, flags)
             return reply unless would_block?(reply)
 
             request = IO::Async::Private::Request::Send.new(
@@ -224,7 +224,7 @@ class IO
           end
 
           def sendto(fd:, buffer:, nbytes:, flags:, addr:, addr_len:, timeout:)
-            reply = Platforms::Functions.sendto(fd, buffer, nbytes, flags, addr, addr_len)
+            reply = POSIX.sendto(fd, buffer, nbytes, flags, addr, addr_len)
             return reply unless would_block?(reply)
 
             request = IO::Async::Private::Request::Sendto.new(
@@ -324,8 +324,8 @@ class IO
           end
 
           def build_command(fiber)
-            # Expects the Platforms::Functions call to return a reply as a hash! See
-            # code at Platforms::Functions.reply
+            # Expects the POSIX function call to return a reply as a hash! See
+            # code at POSIX.reply
             results = yield
             results[:fiber] = fiber
             results

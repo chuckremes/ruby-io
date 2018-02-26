@@ -1,3 +1,5 @@
+require_relative '../common/poller'
+
 class IO
   module Platforms
 
@@ -11,16 +13,16 @@ class IO
       MAX_EVENTS = 25
 
       def initialize(self_pipe:)
-        @kq_fd = Platforms.kqueue
+        @kq_fd = Platforms::Functions.kqueue
 
         # fatal error if we can't allocate the kqueue
         raise "Fatal error, kqueue failed to allocate, rc [#{@kq_fd}], errno [#{::FFI.errno}]" if @kq_fd < 0
 
-        @events_memory = ::FFI::MemoryPointer.new(Platforms::KEventStruct, MAX_EVENTS)
+        @events_memory = ::FFI::MemoryPointer.new(Platforms::Structs::KEventStruct, MAX_EVENTS)
         @events = MAX_EVENTS.times.to_a.map do |index|
-          Platforms::KEventStruct.new(@events_memory + index * Platforms::KEventStruct.size)
+          Platforms::Structs::KEventStruct.new(@events_memory + index * Platforms::Structs::KEventStruct.size)
         end
-        @timespec = TimeSpecStruct.new
+        @timespec = Structs::TimeSpecStruct.new
 
         super
         Logger.debug(klass: self.class, name: 'kqueue poller', message: 'kqueue allocated!')
@@ -72,7 +74,7 @@ class IO
       # in the changelist before we flush to +kevent+.
       def poll
         Logger.debug(klass: self.class, name: 'kqueue poller', message: 'calling kevent')
-        rc = Platforms.kevent(@kq_fd, @events[0], @change_count, @events[0], MAX_EVENTS, shortest_timeout)
+        rc = Platforms::Functions.kevent(@kq_fd, @events[0], @change_count, @events[0], MAX_EVENTS, shortest_timeout)
         @change_count = 0
         Logger.debug(klass: self.class, name: 'kqueue poller', message: "kevent returned [#{rc}] events!")
 

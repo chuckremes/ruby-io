@@ -1,3 +1,4 @@
+require_relative 'poller'
 require_relative 'select'
 
 class IO
@@ -5,12 +6,12 @@ class IO
 
     class SelectPoller < Poller
       def initialize(self_pipe:)
-        @read_master_set   = FDSetStruct.new
-        @read_working_set  = FDSetStruct.new
-        @write_master_set  = FDSetStruct.new
-        @write_working_set = FDSetStruct.new
+        @read_master_set   = Structs::FDSetStruct.new
+        @read_working_set  = Structs::FDSetStruct.new
+        @write_master_set  = Structs::FDSetStruct.new
+        @write_working_set = Structs::FDSetStruct.new
 
-        @timeval = TimeValStruct.new
+        @timeval = Structs::TimeValStruct.new
 
         super
         Logger.debug(klass: self.class, name: 'select poller', message: 'allocated poller')
@@ -52,7 +53,7 @@ class IO
           @read_master_set.max_fd :
           @write_master_set.max_fd
 
-        rc = Platforms.select(max_fd + 1, read_working_set, write_working_set, nil, shortest_timeout)
+        rc = Platforms::Functions.select(max_fd + 1, read_working_set, write_working_set, nil, shortest_timeout)
         Logger.debug(klass: self.class, name: 'select poller', message: "select returned [#{rc}] events!")
 
         if rc >= 0

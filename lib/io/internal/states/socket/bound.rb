@@ -51,18 +51,18 @@ class IO
           end
 
           def accept(timeout: nil)
-            addr = Platforms::SockAddrStorageStruct.new
-            addrlen = Platforms::SockLenStruct.new
+            addr = POSIX::SockAddrStorageStruct.new
+            addrlen = POSIX::SockLenStruct.new
             addrlen[:socklen] = addr.size
             results = @backend.accept(fd: @fd, addr: addr, addrlen: addrlen, timeout: timeout)
 
             if results[:rc] < 0
               [results[:rc], results[:errno], nil]
             else
-              addr = if addr[:ss_family] == Platforms::AF_INET
-                Platforms::SockAddrInStruct.copy_to_new(Platforms::SockAddrInStruct.new(addr.pointer))
+              addr = if addr[:ss_family] == POSIX::AF_INET
+                POSIX::SockAddrInStruct.copy_to_new(POSIX::SockAddrInStruct.new(addr.pointer))
               else
-                Platforms::SockAddrIn6Struct.copy_to_new(Platforms::SockAddrIn6Struct.new(addr.pointer))
+                POSIX::SockAddrIn6Struct.copy_to_new(POSIX::SockAddrIn6Struct.new(addr.pointer))
               end
 
               socket = @parent.class.new(fd: results[:rc], state: :connected)

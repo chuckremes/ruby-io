@@ -64,7 +64,7 @@ class IO
         class PRead < BaseBlocking
           def call
             execute do |fd, buffer, nbytes, offset, timeout|
-              Platforms::Functions.pread(fd, buffer, nbytes, offset)
+              POSIX.pread(fd, buffer, nbytes, offset)
             end
           end
         end
@@ -72,7 +72,7 @@ class IO
         class Read < BaseBlocking
           def call
             execute do |fd, buffer, nbytes, timeout|
-              Platforms::Functions.read(fd, buffer, nbytes)
+              POSIX.read(fd, buffer, nbytes)
             end
           end
         end
@@ -80,7 +80,7 @@ class IO
         class Close < BaseBlocking
           def call
             execute do |fd, timeout|
-              Platforms::Functions.close(fd)
+              POSIX.close(fd)
             end
           end
 
@@ -95,7 +95,7 @@ class IO
         class Open < BaseBlocking
           def call
             execute do |path, flags, mode, timeout|
-              Platforms::Functions.open(path, flags.to_i, mode.to_i)
+              POSIX.open(path, flags.to_i, mode.to_i)
             end
           end
         end
@@ -103,7 +103,7 @@ class IO
         class Socket < BaseBlocking
           def call
             execute do |domain, type, protocol, timeout|
-              Platforms::Functions.socket(domain, type, protocol)
+              POSIX.socket(domain, type, protocol)
             end
           end
         end
@@ -111,7 +111,7 @@ class IO
         class Getaddrinfo < BaseBlocking
           def call
             execute do |hostname, service, hints, results, timeout|
-              Platforms::Functions.getaddrinfo(hostname, service, hints, results)
+              POSIX.getaddrinfo(hostname, service, hints, results)
             end
           end
 
@@ -125,7 +125,7 @@ class IO
         class Getsockopt < BaseBlocking
           def call
             execute do |fd, level, option_name, value, length, timeout|
-              Platforms::Functions.getsockopt(fd, level, option_name, value, length)
+              POSIX.getsockopt(fd, level, option_name, value, length)
             end
           end
         end
@@ -133,7 +133,7 @@ class IO
         class Fcntl < BaseBlocking
           def call
             execute do |fd, cmd, args, timeout|
-              Platforms::Functions.fcntl(fd, cmd, args)
+              POSIX.fcntl(fd, cmd, args)
             end
           end
         end
@@ -141,7 +141,7 @@ class IO
         class Bind < BaseBlocking
           def call
             execute do |fd, addr, addrlen, timeout|
-              Platforms::Functions.bind(fd, addr, addrlen)
+              POSIX.bind(fd, addr, addrlen)
             end
           end
         end
@@ -149,7 +149,7 @@ class IO
         class Listen < BaseBlocking
           def call
             execute do |fd, backlog, timeout|
-              Platforms::Functions.listen(fd, backlog)
+              POSIX.listen(fd, backlog)
             end
           end
         end
@@ -157,7 +157,7 @@ class IO
         class Accept < BaseNonblocking
           def call
             execute do |fd, addr, addrlen, timeout|
-              Platforms::Functions.accept(fd, addr, addrlen)
+              POSIX.accept(fd, addr, addrlen)
             end
           end
 
@@ -192,7 +192,7 @@ class IO
         class Recv < BaseNonblocking
           def call
             execute do |fd, buffer, nbytes, flags, timeout|
-              Platforms::Functions.recv(fd, buffer, nbytes, flags)
+              POSIX.recv(fd, buffer, nbytes, flags)
             end
           end
 
@@ -206,7 +206,7 @@ class IO
         class Recvfrom < BaseNonblocking
           def call
             execute do |fd, buffer, nbytes, flags, addr, addr_len, timeout|
-              Platforms::Functions.recvfrom(fd, buffer, nbytes, flags, addr, addr_len)
+              POSIX.recvfrom(fd, buffer, nbytes, flags, addr, addr_len)
             end
           end
 
@@ -220,7 +220,7 @@ class IO
         class Write < BaseNonblocking
           def call
             execute do |fd, buffer, nbytes, timeout|
-              Platforms::Functions.write(fd, buffer, nbytes)
+              POSIX.write(fd, buffer, nbytes)
             end
           end
 
@@ -234,7 +234,7 @@ class IO
         class PWrite < BaseNonblocking
           def call
             execute do |fd, buffer, nbytes, offset, timeout|
-              Platforms::Functions.pwrite(fd, buffer, nbytes, offset)
+              POSIX.pwrite(fd, buffer, nbytes, offset)
             end
           end
 
@@ -248,7 +248,7 @@ class IO
         class Send < BaseNonblocking
           def call
             execute do |fd, buffer, nbytes, flags, timeout|
-              Platforms::Functions.send(fd, buffer, nbytes, flags)
+              POSIX.send(fd, buffer, nbytes, flags)
             end
           end
 
@@ -262,7 +262,7 @@ class IO
         class Sendto < BaseNonblocking
           def call
             execute do |fd, buffer, nbytes, flags, addr, addr_len, timeout|
-              Platforms::Functions.sendto(fd, buffer, nbytes, flags, addr, addr_len)
+              POSIX.sendto(fd, buffer, nbytes, flags, addr, addr_len)
             end
           end
 

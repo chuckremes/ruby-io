@@ -85,7 +85,7 @@ class IO
         Logger.debug(klass: self.class, name: 'poller', message: 'self-pipe awakened sleeping selector')
         # ignore read errors
         begin
-          reply = Platforms::Functions.read(@self_pipe, @self_pipe_buffer, SELF_PIPE_READ_SIZE)
+          reply = POSIX.read(@self_pipe, @self_pipe_buffer, SELF_PIPE_READ_SIZE)
           rc = reply[:rc]
         end until rc.zero? || rc == -1 || rc < SELF_PIPE_READ_SIZE
         # necessary to reregister since everything is setup for ONESHOT

@@ -4,63 +4,63 @@ class IO
       class Sync
         class << self
           def fcntl(fd:, cmd:, args:, timeout:)
-            Platforms::Functions.fcntl(fd, cmd, args)
+            POSIX.fcntl(fd, cmd, args)
           end
 
           def open(path:, flags:, mode:, timeout:)
-            Platforms::Functions.open(path, flags.to_i, mode.to_i)
+            POSIX.open(path, flags.to_i, mode.to_i)
           end
 
           def close(fd:, timeout:)
-            Platforms::Functions.close(fd)
+            POSIX.close(fd)
           end
 
           def read(fd:, buffer:, nbytes:, timeout:)
-            Platforms::Functions.read(fd, buffer, nbytes)
+            POSIX.read(fd, buffer, nbytes)
           end
 
           def write(fd:, buffer:, nbytes:, timeout:)
-            Platforms::Functions.write(fd, buffer, nbytes)
+            POSIX.write(fd, buffer, nbytes)
           end
 
           def pread(fd:, buffer:, nbytes:, offset:, timeout:)
-            Platforms::Functions.pread(fd, buffer, nbytes, offset)
+            POSIX.pread(fd, buffer, nbytes, offset)
           end
 
           def pwrite(fd:, buffer:, nbytes:, offset:, timeout:)
-            Platforms::Functions.pwrite(fd, buffer, nbytes, offset)
+            POSIX.pwrite(fd, buffer, nbytes, offset)
           end
 
           def getaddrinfo(hostname:, service:, hints:, results:, timeout:)
-            Platforms::Functions.getaddrinfo(hostname, service, hints, results)
+            POSIX.getaddrinfo(hostname, service, hints, results)
           end
 
           def socket(domain:, type:, protocol:, timeout:)
-            Platforms::Functions.socket(domain, type, protocol)
+            POSIX.socket(domain, type, protocol)
           end
 
           def bind(fd:, addr:, addrlen:, timeout:)
-            Platforms::Functions.bind(fd, addr, addrlen)
+            POSIX.bind(fd, addr, addrlen)
           end
 
           def connect(fd:, addr:, addrlen:, timeout:)
-            Platforms::Functions.connect(fd, addr, addrlen)
+            POSIX.connect(fd, addr, addrlen)
           end
 
           def listen(fd:, backlog:, timeout:)
-            Platforms::Functions.listen(fd, backlog)
+            POSIX.listen(fd, backlog)
           end
 
           def accept(fd:, addr:, addrlen:, timeout:)
-            Platforms::Functions.accept(fd, addr, addrlen)
+            POSIX.accept(fd, addr, addrlen)
           end
 
           def send(fd:, buffer:, nbytes:, flags:, timeout:)
-            Platforms::Functions.send(fd, buffer, nbytes, flags)
+            POSIX.send(fd, buffer, nbytes, flags)
           end
 
           def recv(fd:, buffer:, nbytes:, flags:, timeout:)
-            Platforms::Functions.recv(fd, buffer, nbytes, flags)
+            POSIX.recv(fd, buffer, nbytes, flags)
           end
 
           def setup
