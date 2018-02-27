@@ -19,8 +19,8 @@
 * Provide hooks for tracking IO statistics like bytes read/written; define API
 * RAW socket support
 * Shared memory / IPC support?
-* Change Platforms module to POSIX?
-  ** Should consider also supporting some functions that are platform-specific in its own namespace. Thinking of #writev and copy_file_range(2) which are not part of POSIX.
+* DONE - Change Platforms module to POSIX?
+  ** DONE - Should consider also supporting some functions that are platform-specific in its own namespace. Thinking of #writev and copy_file_range(2) which are not part of POSIX.
 * Hook up `timeout:` arg in async methods so it actually does something
 * Get real atomic reference support for main Rubies instead of current hack
 * Expose a `poller` object for both Sync and Async classes; not sure what this would look like yet but suggest it delegates all read/write registration to actual Poller instance (for Async). For Sync, not sure.
