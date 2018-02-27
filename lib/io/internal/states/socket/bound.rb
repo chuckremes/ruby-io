@@ -60,9 +60,9 @@ class IO
               [results[:rc], results[:errno], nil]
             else
               addr = if addr[:ss_family] == POSIX::AF_INET
-                POSIX::SockAddrInStruct.copy_to_new(POSIX::SockAddrInStruct.new(addr.pointer))
+                POSIX::SockAddrInStruct.copy_from(POSIX::SockAddrInStruct.new(addr.pointer))
               else
-                POSIX::SockAddrIn6Struct.copy_to_new(POSIX::SockAddrIn6Struct.new(addr.pointer))
+                POSIX::SockAddrIn6Struct.copy_from(POSIX::SockAddrIn6Struct.new(addr.pointer))
               end
 
               socket = @parent.class.new(fd: results[:rc], state: :connected)

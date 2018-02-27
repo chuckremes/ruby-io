@@ -79,7 +79,7 @@ class IO
             POSIX::SockAddrIn6Struct.new(addrinfo[:ai_addr])
           end
 
-          structs << POSIX::AddrInfoStruct.copy_to_new(addrinfo)
+          structs << POSIX::AddrInfoStruct.copy_from(addrinfo)
 
           ptr = addrinfo[:ai_next]
           break if ptr.nil? || ptr.null?
