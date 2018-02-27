@@ -1,7 +1,7 @@
-require 'io/internal/states/socket/closed'
-require 'io/internal/states/socket/bound'
-require 'io/internal/states/socket/connected'
-require 'io/internal/states/socket/open'
+require_relative 'internal/states/socket/closed'
+require_relative 'internal/states/socket/bound'
+require_relative 'internal/states/socket/connected'
+require_relative 'internal/states/socket/open'
 
 class IO
   class TCP

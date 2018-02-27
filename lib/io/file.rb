@@ -1,7 +1,7 @@
-require 'io/internal/states/file/closed'
-require 'io/internal/states/file/readonly'
-require 'io/internal/states/file/readwrite'
-require 'io/internal/states/file/writeonly'
+require_relative 'internal/states/file/closed'
+require_relative 'internal/states/file/readonly'
+require_relative 'internal/states/file/readwrite'
+require_relative 'internal/states/file/writeonly'
 
 class IO
   class File

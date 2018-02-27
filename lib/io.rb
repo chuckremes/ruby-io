@@ -55,12 +55,12 @@ require_relative 'io/config/mode'
 
 require_relative 'io/mixins/enumerable'
 
-require 'io/fcntl'
-require 'io/file'
-require 'io/socket'
-require 'io/tcp'
-require 'io/timer'
-require 'io/udp'
+require_relative 'io/fcntl'
+require_relative 'io/file'
+require_relative 'io/socket'
+require_relative 'io/tcp'
+require_relative 'io/timer'
+require_relative 'io/udp'
 
 require_relative 'io/async/private/private'
 
