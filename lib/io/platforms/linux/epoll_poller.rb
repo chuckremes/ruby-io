@@ -62,7 +62,7 @@ class IO
       # Waits for epoll events. We can receive up to MAX_EVENTS in reponse.
       def poll
         Logger.debug(klass: self.class, name: 'epoll_wait poller', message: 'calling epoll_wait')
-        rc = Platforms.epoll_wait(@epoll_fd, @events[0], MAX_EVENTS, shortest_timeout)
+        rc = Platforms::Functions.epoll_wait(@epoll_fd, @events[0], MAX_EVENTS, shortest_timeout)
         @change_count = 0
         Logger.debug(klass: self.class, name: 'epoll', message: "epoll_wait returned [#{rc}] events!")
 
@@ -119,7 +119,7 @@ class IO
         end
         Logger.debug(klass: self.class, name: :register, message: "register fd [#{fd}], filter [#{filter}], op [#{operation}]")
 
-        rc = Platforms.epoll_ctl(@epoll_fd, operation, fd, event)
+        rc = Platforms::Functions.epoll_ctl(@epoll_fd, operation, fd, event)
         raise "Fatal error, epoll_ctl returned [#{rc}], errno [#{::FFI.errno}]" if rc < 0
         @change_count += 1
       end
