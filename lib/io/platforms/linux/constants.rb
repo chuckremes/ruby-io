@@ -22,6 +22,14 @@ class IO
       EPOLL_CTL_ADD  = 1
       EPOLL_CTL_DEL  = 2
       EPOLL_CTL_MOD  = 3
+
+      #
+      # Socket related
+      #
+      AF_INET6          = PF_INET6    = 10
+
+      SOL_SOCKET        = 1
+      SO_ERROR          = 4
       
     end
   end

@@ -53,19 +53,13 @@ class IO
       NOTE_MSECONDS = 0x00000000  # data is milliseconds (default!)
       NOTE_NSECONDS = 0x00000004  # data is nanoseconds
 
+      #
+      # Socket related
+      #
+      AF_INET6          = PF_INET6    = 30
 
-      AF_UNSPEC   = PF_UNSPEC   = 0
-      AF_INET     = PF_INET     = 2
-      AF_INET6    = PF_INET6    = 30
-
-      SOCK_STREAM = 1
-      SOCK_DGRAM = 2
-      IPPROTO_TCP = 6
-      IPPROTO_UDP = 17
-      INET_ADDRSTRLEN = 16
-      INET6_ADDRSTRLEN = 46
-      SAE_ASSOCID_ANY = 0
-      SAE_CONNID_ANY = 0
+      SOL_SOCKET        = 0xffff
+      SO_ERROR          = 0x1007
 
     end
   end
